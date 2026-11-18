@@ -2,5 +2,7 @@
   "name": "TablePulse",
   "description": "Interactive dining and visitor survey platform with live analytics dashboard, date tracking, and automatic CSV export.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

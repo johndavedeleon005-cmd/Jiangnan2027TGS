@@ -32,6 +32,7 @@ import {
   type SurveyDraft,
   type SurveyResponse,
 } from '../types/survey';
+import { submitSurveyResponse } from '../utils/surveyStorage';
 import {
   AgeGroupIcon,
   CompanionIcon,
@@ -343,37 +344,28 @@ export function SurveyFlow({
         : draft.paymentMethod;
 
     try {
-      const res = await fetch('/api/surveys', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          consent: draft.consent,
-          name: draft.name.trim(),
-          gender: draft.gender,
-          ageGroup: draft.ageGroup,
-          occupation: draft.occupation,
-          relationshipStatus: draft.relationshipStatus,
-          diningWith: draft.diningWith,
-          partySize: draft.diningWith === 'Solo' ? 1 : draft.partySize,
-          transportMode: draft.transportMode,
-          origin: originFinal,
-          destination: destinationFinal,
-          currency: draft.currency,
-          spendPerPax,
-          spendEstimate,
-          paymentMethod: paymentFinal,
-          clientDate: getLocalDateString(new Date()),
-        }),
+      const created = await submitSurveyResponse({
+        consent: draft.consent,
+        name: draft.name.trim(),
+        gender: draft.gender as SurveyResponse['gender'],
+        ageGroup: draft.ageGroup as SurveyResponse['ageGroup'],
+        occupation: draft.occupation as SurveyResponse['occupation'],
+        relationshipStatus:
+          draft.relationshipStatus as SurveyResponse['relationshipStatus'],
+        diningWith: draft.diningWith as SurveyResponse['diningWith'],
+        partySize: draft.diningWith === 'Solo' ? 1 : draft.partySize,
+        transportMode: draft.transportMode as SurveyResponse['transportMode'],
+        origin: originFinal,
+        destination: destinationFinal,
+        currency: draft.currency,
+        spendPerPax,
+        spendEstimate,
+        paymentMethod: paymentFinal,
+        clientDate: getLocalDateString(new Date()),
       });
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Could not save your survey response.');
-      }
-
-      const data = (await res.json()) as { response: SurveyResponse };
-      setCompletedResponse(data.response);
-      onSubmitted(data.response);
+      setCompletedResponse(created);
+      onSubmitted(created);
     } catch (err) {
       setErrorMsg(
         err instanceof Error ? err.message : 'Network error while submitting survey.'

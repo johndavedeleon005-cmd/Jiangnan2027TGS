@@ -44,6 +44,7 @@ import {
   RelationshipIcon,
   TransportIcon,
 } from './Icons';
+import { getCustomerSurveyUrl } from '../utils/surveyStorage';
 
 export type DatePreset = 'all' | 'today' | '7days' | 'custom';
 
@@ -383,7 +384,7 @@ export function DashboardView({
               Customer Survey Link (Dashboard hidden)
             </div>
             <div className="text-xs font-mono text-slate-500 truncate mt-0.5">
-              {typeof window !== 'undefined' ? `${window.location.origin}/survey` : '/survey'}
+              {getCustomerSurveyUrl()}
             </div>
           </div>
         </div>
@@ -407,10 +408,10 @@ export function DashboardView({
             )}
           </button>
           <a
-            href="/survey"
+            href="#/survey"
             className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[40px] rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition-colors whitespace-nowrap"
           >
-            <span>Open /survey</span>
+            <span>Open Survey</span>
             <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
           </a>
         </div>

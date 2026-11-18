@@ -92,7 +92,7 @@ export function Header({
             {copiedSurveyLink ? (
               <>
                 <Check className="w-3.5 h-3.5 text-red-600" aria-hidden="true" />
-                <span className="text-red-600 font-medium">Copied /survey</span>
+                <span className="text-red-600 font-medium">Copied Link</span>
               </>
             ) : (
               <>

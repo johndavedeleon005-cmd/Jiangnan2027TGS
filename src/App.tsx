@@ -13,25 +13,40 @@ import {
   type SurveyResponse,
 } from './types/survey';
 
-function getViewFromPathname(pathname: string): AppView {
-  const clean = pathname.replace(/\/+$/, '') || '/';
-  if (clean === '/survey') return 'survey';
-  if (clean === '/responses') return 'responses';
+import {
+  clearAllSurveyResponses,
+  deleteSurveyResponseById,
+  getBaseAppUrl,
+  getCustomerSurveyUrl,
+  loadSurveyResponses,
+} from './utils/surveyStorage';
+
+function getViewFromLocation(): AppView {
+  if (typeof window === 'undefined') return 'dashboard';
+
+  const hash = window.location.hash.replace(/^#\/?/, '').replace(/\/+$/, '').toLowerCase();
+  if (hash === 'survey') return 'survey';
+  if (hash === 'responses') return 'responses';
+
+  const params = new URLSearchParams(window.location.search);
+  const queryView = (params.get('view') || '').toLowerCase();
+  if (queryView === 'survey') return 'survey';
+  if (queryView === 'responses') return 'responses';
+
+  const cleanPath = window.location.pathname.replace(/\/+$/, '') || '/';
+  if (cleanPath.endsWith('/survey')) return 'survey';
+  if (cleanPath.endsWith('/responses')) return 'responses';
   return 'dashboard';
 }
 
-function getPathForView(view: AppView): string {
-  if (view === 'survey') return '/survey';
-  if (view === 'responses') return '/responses';
-  return '/';
+function getHashForView(view: AppView): string {
+  if (view === 'survey') return '#/survey';
+  if (view === 'responses') return '#/responses';
+  return '#/';
 }
 
 export default function App() {
-  const [activeView, setActiveView] = useState<AppView>(() =>
-    typeof window !== 'undefined'
-      ? getViewFromPathname(window.location.pathname)
-      : 'dashboard'
-  );
+  const [activeView, setActiveView] = useState<AppView>(() => getViewFromLocation());
   const [responses, setResponses] = useState<SurveyResponse[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,17 +54,21 @@ export default function App() {
   const [copiedSurveyLink, setCopiedSurveyLink] = useState<boolean>(false);
 
   useEffect(() => {
-    const handlePopState = () => {
-      setActiveView(getViewFromPathname(window.location.pathname));
+    const syncView = () => {
+      setActiveView(getViewFromLocation());
     };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    window.addEventListener('hashchange', syncView);
+    window.addEventListener('popstate', syncView);
+    return () => {
+      window.removeEventListener('hashchange', syncView);
+      window.removeEventListener('popstate', syncView);
+    };
   }, []);
 
   const navigateTo = useCallback((view: AppView) => {
-    const nextPath = getPathForView(view);
-    if (window.location.pathname !== nextPath) {
-      window.history.pushState({}, '', nextPath);
+    const nextHash = getHashForView(view);
+    if (window.location.hash !== nextHash) {
+      window.location.hash = nextHash;
     }
     setActiveView(view);
   }, []);
@@ -58,15 +77,11 @@ export default function App() {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/surveys', { cache: 'no-store' });
-      if (!res.ok) {
-        throw new Error('Failed to load survey responses.');
-      }
-      const data = (await res.json()) as { responses: SurveyResponse[] };
-      setResponses(Array.isArray(data.responses) ? data.responses : []);
+      const items = await loadSurveyResponses();
+      setResponses(items);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : 'Unable to reach survey server.'
+        err instanceof Error ? err.message : 'Unable to load survey responses.'
       );
     } finally {
       setIsLoading(false);
@@ -84,23 +99,21 @@ export default function App() {
   };
 
   const handleDeleteResponse = async (id: string) => {
-    const res = await fetch(`/api/surveys/${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-    });
-    if (res.ok) {
+    const ok = await deleteSurveyResponseById(id);
+    if (ok) {
       setResponses((prev) => prev.filter((r) => r.id !== id));
     }
   };
 
   const handleClearAll = async () => {
-    const res = await fetch('/api/surveys', { method: 'DELETE' });
-    if (res.ok) {
+    const ok = await clearAllSurveyResponses();
+    if (ok) {
       setResponses([]);
     }
   };
 
   const handleCopySurveyLink = async () => {
-    const url = `${window.location.origin}/survey`;
+    const url = getCustomerSurveyUrl();
     try {
       await navigator.clipboard.writeText(url);
     } catch {
@@ -139,9 +152,12 @@ export default function App() {
         return;
       }
 
-      const res = await fetch('/api/surveys/export.csv', { cache: 'no-store' });
-      if (!res.ok) {
-        throw new Error('CSV export failed');
+      const res = await fetch(`${getBaseAppUrl()}api/surveys/export.csv`, {
+        cache: 'no-store',
+      });
+      const contentType = (res.headers.get('content-type') || '').toLowerCase();
+      if (!res.ok || !contentType.includes('text/csv')) {
+        throw new Error('CSV export unavailable on static host');
       }
       const csvText = await res.text();
       const stamp = getLocalDateString(new Date());

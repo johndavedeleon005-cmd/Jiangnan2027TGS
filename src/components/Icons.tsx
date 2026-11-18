@@ -33,6 +33,7 @@ import {
   Coins,
   Gem,
 } from 'lucide-react';
+import { getBaseAppUrl } from '../utils/surveyStorage';
 import type {
   AgeGroupOption,
   DiningCompanionOption,
@@ -269,17 +270,17 @@ export function PaymentMethodIcon({
   }
 }
 
-export const BRAND_LOGO_URL =
-  '/assets/aistudio/JIANGNAN_LOGO_RBLACK_TRANSPARENT_781766e1.png';
-
 export function BrandLogo({
   sizeClass = 'w-9 h-9',
 }: {
   sizeClass?: string;
 }) {
+  const base = typeof window !== 'undefined' ? getBaseAppUrl() : '/';
+  const logoSrc = `${base}assets/aistudio/JIANGNAN_LOGO_RBLACK_TRANSPARENT_781766e1.png`;
+
   return (
     <img
-      src={BRAND_LOGO_URL}
+      src={logoSrc}
       alt="Jiang Nan logo"
       className={`${sizeClass} rounded-lg object-contain shrink-0 bg-white`}
     />
