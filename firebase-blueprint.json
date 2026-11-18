@@ -1,0 +1,158 @@
+{
+  "entities": {
+    "SurveyResponse": {
+      "title": "SurveyResponse",
+      "description": "A visitor dining and marketing research survey submission.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique survey response identifier.",
+          "minLength": 4,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "submittedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO-8601 timestamp when the response was submitted.",
+          "minLength": 10,
+          "maxLength": 40
+        },
+        "submittedDate": {
+          "type": "string",
+          "description": "YYYY-MM-DD local submission date.",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "consent": {
+          "type": "string",
+          "description": "Explicit participant consent for marketing research.",
+          "enum": ["Yes"]
+        },
+        "name": {
+          "type": "string",
+          "description": "Optional respondent display name or empty string for anonymous.",
+          "maxLength": 80
+        },
+        "gender": {
+          "type": "string",
+          "description": "Respondent gender selection.",
+          "enum": ["Male", "Female", "Non-binary", "Prefer not to say"],
+          "maxLength": 32
+        },
+        "ageGroup": {
+          "type": "string",
+          "description": "Respondent age range.",
+          "enum": ["Under 18", "18–24", "25–34", "35–44", "45–54", "55+"],
+          "maxLength": 16
+        },
+        "occupation": {
+          "type": "string",
+          "description": "Respondent occupation status.",
+          "enum": ["Student", "Employed", "Unemployed"],
+          "maxLength": 24
+        },
+        "relationshipStatus": {
+          "type": "string",
+          "description": "Respondent relationship status.",
+          "enum": ["Single", "In a Relationship", "Married", "Prefer not to say"],
+          "maxLength": 32
+        },
+        "diningWith": {
+          "type": "string",
+          "description": "Dining companion group type.",
+          "enum": ["Solo", "Friends", "Family"],
+          "maxLength": 16
+        },
+        "partySize": {
+          "type": "number",
+          "description": "Total number of guests in the dining party (1 to 50)."
+        },
+        "transportCategory": {
+          "type": "string",
+          "description": "Private or Public transport classification.",
+          "enum": ["Private", "Public"],
+          "maxLength": 16
+        },
+        "transportMode": {
+          "type": "string",
+          "description": "Specific arrival mode of transport.",
+          "enum": [
+            "Private Car",
+            "Private Motorcycle",
+            "Private Tricycle",
+            "Public Mototaxi",
+            "Public Tricycle",
+            "Ride-Hailing App (Grab)"
+          ],
+          "maxLength": 40
+        },
+        "origin": {
+          "type": "string",
+          "description": "Where the visitor came from before arriving.",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "destination": {
+          "type": "string",
+          "description": "Where the visitor is heading next.",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "currency": {
+          "type": "string",
+          "description": "Selected budget currency.",
+          "enum": ["PHP", "USD"],
+          "maxLength": 3
+        },
+        "spendPerPax": {
+          "type": "string",
+          "description": "Formatted budget bracket or custom amount per person.",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "spendEstimate": {
+          "type": "number",
+          "description": "Numeric spend estimate per person."
+        },
+        "paymentMethod": {
+          "type": "string",
+          "description": "Preferred mode of payment.",
+          "minLength": 1,
+          "maxLength": 60
+        }
+      },
+      "required": [
+        "id",
+        "submittedAt",
+        "submittedDate",
+        "consent",
+        "name",
+        "gender",
+        "ageGroup",
+        "occupation",
+        "relationshipStatus",
+        "diningWith",
+        "partySize",
+        "transportCategory",
+        "transportMode",
+        "origin",
+        "destination",
+        "currency",
+        "spendPerPax",
+        "spendEstimate",
+        "paymentMethod"
+      ]
+    }
+  },
+  "firestore": {
+    "/surveys/{surveyId}": {
+      "schema": {
+        "$ref": "#/entities/SurveyResponse"
+      },
+      "description": "Shared collection of visitor dining survey responses synchronized across all platforms."
+    }
+  }
+}

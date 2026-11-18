@@ -1,0 +1,100 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 4 && id.size() <= 64 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidSurveyResponse(data, surveyId) {
+      return data.keys().hasAll([
+        'id',
+        'submittedAt',
+        'submittedDate',
+        'consent',
+        'name',
+        'gender',
+        'ageGroup',
+        'occupation',
+        'relationshipStatus',
+        'diningWith',
+        'partySize',
+        'transportCategory',
+        'transportMode',
+        'origin',
+        'destination',
+        'currency',
+        'spendPerPax',
+        'spendEstimate',
+        'paymentMethod'
+      ]) &&
+      data.keys().hasOnly([
+        'id',
+        'submittedAt',
+        'submittedDate',
+        'consent',
+        'name',
+        'gender',
+        'ageGroup',
+        'occupation',
+        'relationshipStatus',
+        'diningWith',
+        'partySize',
+        'transportCategory',
+        'transportMode',
+        'origin',
+        'destination',
+        'currency',
+        'spendPerPax',
+        'spendEstimate',
+        'paymentMethod'
+      ]) &&
+      data.id is string && data.id.size() >= 4 && data.id.size() <= 64 && data.id == surveyId &&
+      data.submittedAt is string && data.submittedAt.size() >= 10 && data.submittedAt.size() <= 40 &&
+      data.submittedDate is string && data.submittedDate.size() == 10 && data.submittedDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+      data.consent is string && data.consent.size() == 3 && data.consent == 'Yes' &&
+      data.name is string && data.name.size() <= 80 &&
+      data.gender is string && data.gender.size() <= 32 && data.gender in ['Male', 'Female', 'Non-binary', 'Prefer not to say'] &&
+      data.ageGroup is string && data.ageGroup.size() <= 16 && data.ageGroup in ['Under 18', '18–24', '25–34', '35–44', '45–54', '55+'] &&
+      data.occupation is string && data.occupation.size() <= 24 && data.occupation in ['Student', 'Employed', 'Unemployed'] &&
+      data.relationshipStatus is string && data.relationshipStatus.size() <= 32 && data.relationshipStatus in ['Single', 'In a Relationship', 'Married', 'Prefer not to say'] &&
+      data.diningWith is string && data.diningWith.size() <= 16 && data.diningWith in ['Solo', 'Friends', 'Family'] &&
+      data.partySize is number && data.partySize >= 1 && data.partySize <= 50 &&
+      data.transportCategory is string && data.transportCategory.size() <= 16 && data.transportCategory in ['Private', 'Public'] &&
+      data.transportMode is string && data.transportMode.size() <= 40 && data.transportMode in [
+        'Private Car',
+        'Private Motorcycle',
+        'Private Tricycle',
+        'Public Mototaxi',
+        'Public Tricycle',
+        'Ride-Hailing App (Grab)'
+      ] &&
+      data.origin is string && data.origin.size() >= 1 && data.origin.size() <= 80 &&
+      data.destination is string && data.destination.size() >= 1 && data.destination.size() <= 80 &&
+      data.currency is string && data.currency.size() == 3 && data.currency in ['PHP', 'USD'] &&
+      data.spendPerPax is string && data.spendPerPax.size() >= 1 && data.spendPerPax.size() <= 40 &&
+      data.spendEstimate is number && data.spendEstimate >= 0 && data.spendEstimate <= 1000000 &&
+      data.paymentMethod is string && data.paymentMethod.size() >= 1 && data.paymentMethod.size() <= 60;
+    }
+
+    match /surveys/{surveyId} {
+      allow get: if isValidId(surveyId) && existing().consent == 'Yes';
+      allow list: if existing().consent == 'Yes';
+      allow create: if isValidId(surveyId) && isValidSurveyResponse(incoming(), surveyId);
+      allow update: if false;
+      allow delete: if isValidId(surveyId) && existing().consent == 'Yes';
+    }
+  }
+}

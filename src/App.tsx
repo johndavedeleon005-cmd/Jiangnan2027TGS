@@ -16,9 +16,9 @@ import {
 import {
   clearAllSurveyResponses,
   deleteSurveyResponseById,
-  getBaseAppUrl,
   getCustomerSurveyUrl,
   loadSurveyResponses,
+  subscribeToSurveyResponses,
 } from './utils/surveyStorage';
 
 function getViewFromLocation(): AppView {
@@ -48,7 +48,7 @@ function getHashForView(view: AppView): string {
 export default function App() {
   const [activeView, setActiveView] = useState<AppView>(() => getViewFromLocation());
   const [responses, setResponses] = useState<SurveyResponse[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
   const [copiedSurveyLink, setCopiedSurveyLink] = useState<boolean>(false);
@@ -89,13 +89,32 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (activeView !== 'survey') {
-      void fetchResponses();
+    if (activeView === 'survey') {
+      return;
     }
-  }, [activeView, fetchResponses]);
+    setIsLoading(true);
+    setError(null);
+    const unsubscribe = subscribeToSurveyResponses(
+      (items) => {
+        setResponses(items);
+        setIsLoading(false);
+        setError(null);
+      },
+      (err) => {
+        setError(err.message || 'Unable to load survey responses.');
+        setIsLoading(false);
+      }
+    );
+    return () => {
+      unsubscribe();
+    };
+  }, [activeView]);
 
   const handleSubmitted = (created: SurveyResponse) => {
-    setResponses((prev) => [created, ...prev]);
+    setResponses((prev) => {
+      if (prev.some((r) => r.id === created.id)) return prev;
+      return [created, ...prev];
+    });
   };
 
   const handleDeleteResponse = async (id: string) => {
@@ -146,25 +165,12 @@ export default function App() {
   ) => {
     setIsDownloading(true);
     try {
-      if (customRows && filterLabel && filterLabel !== 'all-dates') {
-        const csv = buildSurveyCsv(customRows);
-        triggerCsvDownload(csv, `tablepulse-surveys-${filterLabel}.csv`);
-        return;
-      }
-
-      const res = await fetch(`${getBaseAppUrl()}api/surveys/export.csv`, {
-        cache: 'no-store',
-      });
-      const contentType = (res.headers.get('content-type') || '').toLowerCase();
-      if (!res.ok || !contentType.includes('text/csv')) {
-        throw new Error('CSV export unavailable on static host');
-      }
-      const csvText = await res.text();
-      const stamp = getLocalDateString(new Date());
-      triggerCsvDownload(csvText, `tablepulse-surveys-${stamp}.csv`);
-    } catch {
-      const csv = buildSurveyCsv(customRows ?? responses);
-      const stamp = getLocalDateString(new Date());
+      const rowsToExport = customRows ?? responses;
+      const csv = buildSurveyCsv(rowsToExport);
+      const stamp =
+        filterLabel && filterLabel !== 'all-dates'
+          ? filterLabel
+          : getLocalDateString(new Date());
       triggerCsvDownload(csv, `tablepulse-surveys-${stamp}.csv`);
     } finally {
       setIsDownloading(false);
