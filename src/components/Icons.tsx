@@ -278,6 +278,8 @@ export function BrandLogo({
   const base = typeof window !== 'undefined' ? getBaseAppUrl() : './';
   const primarySrc = `${base}assets/aistudio/JIANGNAN_LOGO_RBLACK_TRANSPARENT_781766e1.png`;
   const fallbackSrc = `${base}public/assets/aistudio/JIANGNAN_LOGO_RBLACK_TRANSPARENT_781766e1.png`;
+  const githubRawSrc =
+    'https://raw.githubusercontent.com/johndavedeleon005-cmd/Jiangnan2027TGS/main/public/assets/aistudio/JIANGNAN_LOGO_RBLACK_TRANSPARENT_781766e1.png';
 
   return (
     <img
@@ -285,8 +287,13 @@ export function BrandLogo({
       alt="Jiang Nan logo"
       onError={(e) => {
         const img = e.currentTarget;
-        if (img.src !== fallbackSrc) {
+        const step = img.getAttribute('data-fallback-step');
+        if (!step) {
+          img.setAttribute('data-fallback-step', '1');
           img.src = fallbackSrc;
+        } else if (step === '1') {
+          img.setAttribute('data-fallback-step', '2');
+          img.src = githubRawSrc;
         }
       }}
       className={`${sizeClass} rounded-lg object-contain shrink-0 bg-white`}

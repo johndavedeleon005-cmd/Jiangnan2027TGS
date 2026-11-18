@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Jiang Nan — Redirecting…</title>
+    <script>
+      (function () {
+        var path = window.location.pathname || '/';
+        var search = window.location.search || '';
+        var hash = window.location.hash || '';
+        if (/\/survey\/?$/i.test(path)) {
+          var baseSurvey = path.replace(/\/survey\/?$/i, '/');
+          window.location.replace(window.location.origin + baseSurvey + search + '#/survey');
+        } else if (/\/responses\/?$/i.test(path)) {
+          var baseResponses = path.replace(/\/responses\/?$/i, '/');
+          window.location.replace(window.location.origin + baseResponses + search + '#/responses');
+        } else {
+          var cleanBase = path.replace(/\/[^/]*$/, '/');
+          window.location.replace(window.location.origin + cleanBase + search + (hash || '#/'));
+        }
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>
