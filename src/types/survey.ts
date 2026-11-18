@@ -1,0 +1,328 @@
+export type GenderOption = 'Male' | 'Female' | 'Non-binary' | 'Prefer not to say';
+
+export type AgeGroupOption =
+  | 'Under 18'
+  | '18–24'
+  | '25–34'
+  | '35–44'
+  | '45–54'
+  | '55+';
+
+export type OccupationOption = 'Student' | 'Employed' | 'Unemployed';
+
+export type RelationshipStatusOption =
+  | 'Single'
+  | 'In a Relationship'
+  | 'Married'
+  | 'Prefer not to say';
+
+export type DiningCompanionOption = 'Solo' | 'Friends' | 'Family';
+
+export type TransportCategory = 'Private' | 'Public';
+
+export type TransportModeOption =
+  | 'Private Car'
+  | 'Private Motorcycle'
+  | 'Private Tricycle'
+  | 'Public Mototaxi'
+  | 'Public Tricycle'
+  | 'Ride-Hailing App (Grab)';
+
+export type LocationOption =
+  | 'Home'
+  | 'Office'
+  | 'Church'
+  | 'Supermarket'
+  | 'Department Store'
+  | 'Airport'
+  | 'Other';
+
+export type CurrencyCode = 'PHP' | 'USD';
+
+export type PaymentMethodOption =
+  | 'Cash'
+  | 'E-Wallet (GCash / Maya)'
+  | 'Credit / Debit Card'
+  | 'Bank Transfer'
+  | 'Other';
+
+export type ConsentOption = 'Yes' | 'No';
+
+export interface SurveyDraft {
+  consent: ConsentOption | '';
+  name: string;
+  gender: GenderOption | '';
+  ageGroup: AgeGroupOption | '';
+  occupation: OccupationOption | '';
+  relationshipStatus: RelationshipStatusOption | '';
+  diningWith: DiningCompanionOption | '';
+  partySize: number;
+  transportMode: TransportModeOption | '';
+  origin: string;
+  originOther: string;
+  destination: string;
+  destinationOther: string;
+  currency: CurrencyCode;
+  spendBracket: string;
+  customSpend: string;
+  paymentMethod: PaymentMethodOption | '';
+  paymentOther: string;
+}
+
+export interface SurveyResponse {
+  id: string;
+  submittedAt: string; // ISO timestamp
+  submittedDate: string; // YYYY-MM-DD in local time of submission
+  consent?: ConsentOption;
+  name: string; // empty string or 'Anonymous' displayed if omitted
+  gender: GenderOption;
+  ageGroup: AgeGroupOption;
+  occupation?: OccupationOption;
+  relationshipStatus?: RelationshipStatusOption;
+  diningWith: DiningCompanionOption;
+  partySize: number;
+  transportCategory: TransportCategory;
+  transportMode: TransportModeOption;
+  origin: string;
+  destination: string;
+  currency: CurrencyCode;
+  spendPerPax: string;
+  spendEstimate: number;
+  paymentMethod?: string;
+}
+
+export const GENDER_OPTIONS: { value: GenderOption; label: string; hint: string }[] = [
+  { value: 'Male', label: 'Male', hint: 'Man / Male' },
+  { value: 'Female', label: 'Female', hint: 'Woman / Female' },
+  { value: 'Non-binary', label: 'Non-binary', hint: 'Other gender identity' },
+  { value: 'Prefer not to say', label: 'Prefer not to say', hint: 'Keep private' },
+];
+
+export const AGE_GROUP_OPTIONS: { value: AgeGroupOption; label: string }[] = [
+  { value: 'Under 18', label: 'Under 18' },
+  { value: '18–24', label: '18–24' },
+  { value: '25–34', label: '25–34' },
+  { value: '35–44', label: '35–44' },
+  { value: '45–54', label: '45–54' },
+  { value: '55+', label: '55+' },
+];
+
+export const OCCUPATION_OPTIONS: {
+  value: OccupationOption;
+  label: string;
+  hint: string;
+}[] = [
+  { value: 'Student', label: 'Student', hint: 'High school, college, or grad' },
+  { value: 'Employed', label: 'Employed', hint: 'Working or self-employed' },
+  { value: 'Unemployed', label: 'Unemployed', hint: 'Currently not working' },
+];
+
+export const RELATIONSHIP_STATUS_OPTIONS: {
+  value: RelationshipStatusOption;
+  label: string;
+  hint: string;
+}[] = [
+  { value: 'Single', label: 'Single', hint: 'Unmarried / not partnered' },
+  { value: 'In a Relationship', label: 'In a Relationship', hint: 'Dating or partnered' },
+  { value: 'Married', label: 'Married', hint: 'With spouse' },
+  { value: 'Prefer not to say', label: 'Prefer not to say', hint: 'Keep private' },
+];
+
+export const COMPANION_OPTIONS: {
+  value: DiningCompanionOption;
+  label: string;
+  hint: string;
+}[] = [
+  { value: 'Solo', label: 'Solo', hint: 'Dining on your own (1 pax)' },
+  { value: 'Friends', label: 'With Friends', hint: 'Social outing or hangout' },
+  { value: 'Family', label: 'With Family', hint: 'Parents, kids, or relatives' },
+];
+
+export const TRANSPORT_OPTIONS: {
+  value: TransportModeOption;
+  category: TransportCategory;
+  label: string;
+  hint: string;
+}[] = [
+  {
+    value: 'Private Car',
+    category: 'Private',
+    label: 'Private Car',
+    hint: 'Own or family vehicle',
+  },
+  {
+    value: 'Private Motorcycle',
+    category: 'Private',
+    label: 'Private Motorcycle',
+    hint: 'Personal motorbike / scooter',
+  },
+  {
+    value: 'Private Tricycle',
+    category: 'Private',
+    label: 'Private Tricycle',
+    hint: 'Personal / family tricycle',
+  },
+  {
+    value: 'Public Mototaxi',
+    category: 'Public',
+    label: 'Public Mototaxi',
+    hint: 'Habal-habal / Angkas / JoyRide',
+  },
+  {
+    value: 'Public Tricycle',
+    category: 'Public',
+    label: 'Public Tricycle',
+    hint: 'Toda / street-hailed tricycle',
+  },
+  {
+    value: 'Ride-Hailing App (Grab)',
+    category: 'Public',
+    label: 'Car Ride-Hailing (Grab)',
+    hint: 'GrabCar / TNVS booking',
+  },
+];
+
+export const LOCATION_OPTIONS: {
+  value: LocationOption;
+  label: string;
+  hint: string;
+}[] = [
+  { value: 'Home', label: 'Home', hint: 'Residence / condo' },
+  { value: 'Office', label: 'Office', hint: 'Workplace / school' },
+  { value: 'Church', label: 'Church', hint: 'Parish / place of worship' },
+  { value: 'Supermarket', label: 'Supermarket', hint: 'Grocery / market run' },
+  { value: 'Department Store', label: 'Department Store', hint: 'Mall / retail shopping' },
+  { value: 'Airport', label: 'Airport', hint: 'Flight arrival or departure' },
+  { value: 'Other', label: 'Other Place', hint: 'Specify another location' },
+];
+
+export const SPEND_BRACKETS: Record<
+  CurrencyCode,
+  { label: string; estimate: number; hint: string }[]
+> = {
+  PHP: [
+    { label: 'Under ₱150', estimate: 120, hint: 'Quick snack or drink' },
+    { label: '₱150 – ₱300', estimate: 225, hint: 'Casual value meal' },
+    { label: '₱301 – ₱500', estimate: 400, hint: 'Standard dine-in' },
+    { label: '₱501 – ₱800', estimate: 650, hint: 'Full meal & drinks' },
+    { label: '₱801 – ₱1,200', estimate: 1000, hint: 'Special dining' },
+    { label: 'Over ₱1,200', estimate: 1500, hint: 'Premium experience' },
+  ],
+  USD: [
+    { label: 'Under $10', estimate: 8, hint: 'Quick snack or drink' },
+    { label: '$10 – $20', estimate: 15, hint: 'Casual value meal' },
+    { label: '$21 – $35', estimate: 28, hint: 'Standard dine-in' },
+    { label: '$36 – $55', estimate: 45, hint: 'Full meal & drinks' },
+    { label: '$56 – $85', estimate: 70, hint: 'Special dining' },
+    { label: 'Over $85', estimate: 100, hint: 'Premium experience' },
+  ],
+};
+
+export const PAYMENT_METHOD_OPTIONS: {
+  value: PaymentMethodOption;
+  label: string;
+  hint: string;
+}[] = [
+  { value: 'Cash', label: 'Cash', hint: 'Physical bills or coins' },
+  {
+    value: 'E-Wallet (GCash / Maya)',
+    label: 'E-Wallet (GCash / Maya)',
+    hint: 'QRPh or mobile wallet scan',
+  },
+  {
+    value: 'Credit / Debit Card',
+    label: 'Credit / Debit Card',
+    hint: 'Visa, Mastercard, tap-to-pay',
+  },
+  {
+    value: 'Bank Transfer',
+    label: 'Bank Transfer',
+    hint: 'InstaPay / PESONet / online',
+  },
+  { value: 'Other', label: 'Other Method', hint: 'Voucher, gift card, or other' },
+];
+
+export function getTransportCategory(mode: TransportModeOption): TransportCategory {
+  const found = TRANSPORT_OPTIONS.find((item) => item.value === mode);
+  return found ? found.category : 'Public';
+}
+
+export function getLocalDateString(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function escapeCsvCell(value: string | number): string {
+  const str = String(value ?? '');
+  if (/[",\r\n]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+export function buildSurveyCsv(responses: SurveyResponse[]): string {
+  const headers = [
+    'Response ID',
+    'Date',
+    'Time',
+    'Submitted At (ISO)',
+    'Marketing Research Consent',
+    'Name',
+    'Gender',
+    'Age',
+    'Occupation',
+    'Relationship Status',
+    'Dining Companion',
+    'Party Size (Pax)',
+    'Transport Category',
+    'Transport Mode',
+    'Where Before (Origin)',
+    'Where Heading Next (Destination)',
+    'Currency',
+    'Budget Per Pax',
+    'Estimated Spend Per Pax',
+    'Preferred Mode of Payment',
+  ];
+
+  const rows = responses.map((r) => {
+    const dt = new Date(r.submittedAt);
+    const timeStr = Number.isNaN(dt.getTime())
+      ? ''
+      : dt.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+        });
+
+    return [
+      r.id,
+      r.submittedDate,
+      timeStr,
+      r.submittedAt,
+      r.consent || 'Yes',
+      r.name || 'Anonymous',
+      r.gender,
+      r.ageGroup,
+      r.occupation || 'Unspecified',
+      r.relationshipStatus || 'Unspecified',
+      r.diningWith,
+      r.partySize,
+      r.transportCategory,
+      r.transportMode,
+      r.origin,
+      r.destination,
+      r.currency,
+      r.spendPerPax,
+      r.spendEstimate,
+      r.paymentMethod || 'Unspecified',
+    ]
+      .map(escapeCsvCell)
+      .join(',');
+  });
+
+  // Prefix UTF-8 BOM so Excel opens currency symbols like ₱ cleanly
+  return '\uFEFF' + [headers.map(escapeCsvCell).join(','), ...rows].join('\r\n');
+}
