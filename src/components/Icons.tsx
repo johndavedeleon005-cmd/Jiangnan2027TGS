@@ -275,13 +275,20 @@ export function BrandLogo({
 }: {
   sizeClass?: string;
 }) {
-  const base = typeof window !== 'undefined' ? getBaseAppUrl() : '/';
-  const logoSrc = `${base}assets/aistudio/JIANGNAN_LOGO_RBLACK_TRANSPARENT_781766e1.png`;
+  const base = typeof window !== 'undefined' ? getBaseAppUrl() : './';
+  const primarySrc = `${base}assets/aistudio/JIANGNAN_LOGO_RBLACK_TRANSPARENT_781766e1.png`;
+  const fallbackSrc = `${base}public/assets/aistudio/JIANGNAN_LOGO_RBLACK_TRANSPARENT_781766e1.png`;
 
   return (
     <img
-      src={logoSrc}
+      src={primarySrc}
       alt="Jiang Nan logo"
+      onError={(e) => {
+        const img = e.currentTarget;
+        if (img.src !== fallbackSrc) {
+          img.src = fallbackSrc;
+        }
+      }}
       className={`${sizeClass} rounded-lg object-contain shrink-0 bg-white`}
     />
   );
