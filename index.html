@@ -21,19 +21,96 @@
       (function () {
         var rawEntry = document.querySelector('script[src="/src/main.tsx"]');
         var viteClient = document.querySelector('script[src*="@vite/client"]');
-        if (rawEntry && !viteClient) {
-          rawEntry.remove();
-          var css = document.createElement('link');
-          css.rel = 'stylesheet';
-          css.href = './gh-pages-dist/app.css';
-          document.head.appendChild(css);
-          var js = document.createElement('script');
-          js.type = 'module';
-          js.src = './gh-pages-dist/app.js';
-          document.body.appendChild(js);
+        if (!rawEntry || viteClient) return;
+        rawEntry.remove();
+
+        var style = document.createElement('style');
+        style.textContent =
+          'html{font-family:"DM Sans",ui-sans-serif,system-ui,sans-serif;scroll-behavior:smooth}' +
+          'h1,h2,h3,h4{font-family:"Plus Jakarta Sans",ui-sans-serif,system-ui,sans-serif}' +
+          '.font-mono{font-family:"JetBrains Mono",ui-monospace,monospace}' +
+          '.tabular-nums{font-variant-numeric:tabular-nums}';
+        document.head.appendChild(style);
+
+        function loadScript(src) {
+          return new Promise(function (resolve, reject) {
+            var s = document.createElement('script');
+            s.src = src;
+            s.onload = resolve;
+            s.onerror = reject;
+            document.head.appendChild(s);
+          });
         }
+
+        Promise.all([
+          loadScript('https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4'),
+          loadScript('https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.9/babel.min.js')
+        ]).then(async function () {
+          var files = [
+            'src/types/survey.ts',
+            'src/utils/surveyStorage.ts',
+            'src/components/Icons.tsx',
+            'src/components/Header.tsx',
+            'src/components/SurveyFlow.tsx',
+            'src/components/DashboardView.tsx',
+            'src/App.tsx',
+            'src/main.tsx'
+          ];
+          var sources = {};
+          await Promise.all(
+            files.map(async function (f) {
+              var res = await fetch('./' + f, { cache: 'no-store' });
+              sources[f] = await res.text();
+            })
+          );
+
+          var blobs = {};
+          var importMap = {
+            'react': 'https://esm.sh/react@19.0.1',
+            'react-dom/client': 'https://esm.sh/react-dom@19.0.1/client',
+            'lucide-react': 'https://esm.sh/lucide-react@0.546.0?deps=react@19.0.1',
+            '../types/survey': function () { return blobs['src/types/survey.ts']; },
+            './types/survey': function () { return blobs['src/types/survey.ts']; },
+            '../utils/surveyStorage': function () { return blobs['src/utils/surveyStorage.ts']; },
+            './utils/surveyStorage': function () { return blobs['src/utils/surveyStorage.ts']; },
+            './Icons': function () { return blobs['src/components/Icons.tsx']; },
+            './components/Header': function () { return blobs['src/components/Header.tsx']; },
+            './components/SurveyFlow': function () { return blobs['src/components/SurveyFlow.tsx']; },
+            './components/DashboardView': function () { return blobs['src/components/DashboardView.tsx']; },
+            './App.tsx': function () { return blobs['src/App.tsx']; }
+          };
+
+          for (var i = 0; i < files.length; i++) {
+            var file = files[i];
+            var raw = sources[file].replace(/import\s+['"]\.\/index\.css['"];?/g, '');
+            var transpiled = window.Babel.transform(raw, {
+              filename: file,
+              presets: [
+                'react',
+                ['typescript', { isTSX: true, allExtensions: true }]
+              ]
+            }).code;
+
+            var resolved = transpiled.replace(
+              /(from\s+['"])([^'"]+)(['"])/g,
+              function (_, p1, spec, p3) {
+                var target = importMap[spec];
+                var url = typeof target === 'function' ? target() : target || spec;
+                return p1 + url + p3;
+              }
+            );
+
+            blobs[file] = URL.createObjectURL(
+              new Blob([resolved], { type: 'text/javascript' })
+            );
+          }
+
+          var entry = document.createElement('script');
+          entry.type = 'module';
+          entry.src = blobs['src/main.tsx'];
+          document.body.appendChild(entry);
+        });
       })();
     </script>
   </body>
 </html>
-
