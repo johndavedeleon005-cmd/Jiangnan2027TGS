@@ -89,9 +89,6 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (activeView === 'survey') {
-      return;
-    }
     setIsLoading(true);
     setError(null);
     const unsubscribe = subscribeToSurveyResponses(
@@ -108,7 +105,7 @@ export default function App() {
     return () => {
       unsubscribe();
     };
-  }, [activeView]);
+  }, []);
 
   const handleSubmitted = (created: SurveyResponse) => {
     setResponses((prev) => {

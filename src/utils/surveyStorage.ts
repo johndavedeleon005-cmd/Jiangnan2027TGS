@@ -12,14 +12,62 @@ import { db, handleFirestoreError, OperationType } from '../firebase';
 import {
   getLocalDateString,
   getTransportCategory,
+  type AgeGroupOption,
   type CurrencyCode,
   type DiningCompanionOption,
+  type GenderOption,
+  type OccupationOption,
+  type RelationshipStatusOption,
   type SurveyResponse,
   type TransportModeOption,
 } from '../types/survey';
 
 const LOCAL_STORAGE_KEY = 'jiangnan_survey_responses_v1';
 const COLLECTION_PATH = 'surveys';
+
+const VALID_GENDERS: GenderOption[] = [
+  'Male',
+  'Female',
+  'Non-binary',
+  'Prefer not to say',
+];
+
+const VALID_AGE_GROUPS: AgeGroupOption[] = [
+  'Under 18',
+  '18–24',
+  '25–34',
+  '35–44',
+  '45–54',
+  '55+',
+];
+
+const VALID_OCCUPATIONS: OccupationOption[] = [
+  'Student',
+  'Employed',
+  'Unemployed',
+];
+
+const VALID_RELATIONSHIPS: RelationshipStatusOption[] = [
+  'Single',
+  'In a Relationship',
+  'Married',
+  'Prefer not to say',
+];
+
+const VALID_COMPANIONS: DiningCompanionOption[] = [
+  'Solo',
+  'Friends',
+  'Family',
+];
+
+const VALID_TRANSPORTS: TransportModeOption[] = [
+  'Private Car',
+  'Private Motorcycle',
+  'Private Tricycle',
+  'Public Mototaxi',
+  'Public Tricycle',
+  'Ride-Hailing App (Grab)',
+];
 
 export function getBaseAppUrl(): string {
   if (typeof window === 'undefined') return '';
@@ -46,15 +94,19 @@ function readLocalResponses(): SurveyResponse[] {
   }
 }
 
-function clearLocalResponses(): void {
+function writeLocalResponses(items: SurveyResponse[]): void {
   try {
-    window.localStorage.removeItem(LOCAL_STORAGE_KEY);
+    if (items.length === 0) {
+      window.localStorage.removeItem(LOCAL_STORAGE_KEY);
+    } else {
+      window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(items));
+    }
   } catch {
     // Ignore storage errors
   }
 }
 
-function sanitizeSurveyResponse(raw: SurveyResponse): SurveyResponse {
+function sanitizeSurveyResponse(raw: Partial<SurveyResponse>): SurveyResponse {
   const safeId =
     String(raw.id || '')
       .replace(/[^a-zA-Z0-9_-]/g, '')
@@ -73,17 +125,46 @@ function sanitizeSurveyResponse(raw: SurveyResponse): SurveyResponse {
       ? raw.submittedDate
       : getLocalDateString(now);
 
-  const diningWith: DiningCompanionOption =
-    raw.diningWith === 'Solo' ||
-    raw.diningWith === 'Friends' ||
-    raw.diningWith === 'Family'
-      ? raw.diningWith
-      : 'Solo';
+  const gender: GenderOption = VALID_GENDERS.includes(
+    raw.gender as GenderOption
+  )
+    ? (raw.gender as GenderOption)
+    : 'Prefer not to say';
+
+  const normalizedAge = String(raw.ageGroup || '').replace(/-/g, '–') as AgeGroupOption;
+  const ageGroup: AgeGroupOption = VALID_AGE_GROUPS.includes(normalizedAge)
+    ? normalizedAge
+    : '25–34';
+
+  const occupation: OccupationOption = VALID_OCCUPATIONS.includes(
+    raw.occupation as OccupationOption
+  )
+    ? (raw.occupation as OccupationOption)
+    : 'Employed';
+
+  const relationshipStatus: RelationshipStatusOption =
+    VALID_RELATIONSHIPS.includes(
+      raw.relationshipStatus as RelationshipStatusOption
+    )
+      ? (raw.relationshipStatus as RelationshipStatusOption)
+      : 'Prefer not to say';
+
+  const diningWith: DiningCompanionOption = VALID_COMPANIONS.includes(
+    raw.diningWith as DiningCompanionOption
+  )
+    ? (raw.diningWith as DiningCompanionOption)
+    : 'Solo';
 
   const partySize =
     diningWith === 'Solo'
       ? 1
       : Math.min(50, Math.max(1, Math.round(Number(raw.partySize) || 2)));
+
+  const transportMode: TransportModeOption = VALID_TRANSPORTS.includes(
+    raw.transportMode as TransportModeOption
+  )
+    ? (raw.transportMode as TransportModeOption)
+    : 'Private Car';
 
   const spendEstimate = Math.min(
     1000000,
@@ -96,14 +177,14 @@ function sanitizeSurveyResponse(raw: SurveyResponse): SurveyResponse {
     submittedDate,
     consent: 'Yes',
     name: String(raw.name || '').trim().slice(0, 80),
-    gender: raw.gender,
-    ageGroup: raw.ageGroup,
-    occupation: raw.occupation || 'Employed',
-    relationshipStatus: raw.relationshipStatus || 'Prefer not to say',
+    gender,
+    ageGroup,
+    occupation,
+    relationshipStatus,
     diningWith,
     partySize,
-    transportCategory: getTransportCategory(raw.transportMode),
-    transportMode: raw.transportMode,
+    transportCategory: getTransportCategory(transportMode),
+    transportMode,
     origin: String(raw.origin || 'Other').trim().slice(0, 80) || 'Other',
     destination:
       String(raw.destination || 'Other').trim().slice(0, 80) || 'Other',
@@ -123,26 +204,33 @@ function sortResponsesNewestFirst(items: SurveyResponse[]): SurveyResponse[] {
   );
 }
 
-let hasMigratedLocal = false;
+let isMigrating = false;
 
-async function migrateExistingLocalResponses(): Promise<void> {
-  if (hasMigratedLocal || typeof window === 'undefined') return;
-  hasMigratedLocal = true;
-
+export async function migrateExistingLocalResponses(): Promise<void> {
+  if (isMigrating || typeof window === 'undefined') return;
   const localItems = readLocalResponses();
   if (localItems.length === 0) return;
 
+  isMigrating = true;
+  const remaining: SurveyResponse[] = [];
+
   try {
-    await Promise.all(
-      localItems.map(async (item) => {
+    for (const item of localItems) {
+      try {
         const clean = sanitizeSurveyResponse(item);
         await setDoc(doc(db, COLLECTION_PATH, clean.id), clean);
-      })
-    );
-    clearLocalResponses();
-  } catch {
-    // Keep local items if offline
+      } catch {
+        remaining.push(item);
+      }
+    }
+    writeLocalResponses(remaining);
+  } finally {
+    isMigrating = false;
   }
+}
+
+if (typeof window !== 'undefined') {
+  void migrateExistingLocalResponses();
 }
 
 export function subscribeToSurveyResponses(
@@ -218,6 +306,8 @@ export async function submitSurveyResponse(
   if (payload.consent !== 'Yes') {
     throw new Error('Participant consent is required to submit.');
   }
+
+  void migrateExistingLocalResponses();
 
   const now = new Date();
   const id = `SRV-${now.getTime().toString(36).toUpperCase()}-${Math.random()
