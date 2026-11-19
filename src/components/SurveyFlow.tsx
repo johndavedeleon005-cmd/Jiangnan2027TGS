@@ -147,16 +147,16 @@ const ALL_STEPS: StepMeta[] = [
   {
     id: 'origin',
     number: '10',
-    title: 'Previous Stop',
-    question: 'Before coming here, where were you?',
-    subtitle: 'Select the place you traveled from.',
+    title: 'Before Dining',
+    question: 'Where were you before you decided to dine with us?',
+    subtitle: 'Select the place you were at before deciding to dine with us.',
   },
   {
     id: 'destination',
     number: '11',
-    title: 'Next Stop',
-    question: 'After this, where are you heading?',
-    subtitle: 'Select your next destination.',
+    title: 'After Dining',
+    question: 'Where are you heading after dining with us?',
+    subtitle: 'Select the place you plan to go after dining with us.',
   },
   {
     id: 'spend',

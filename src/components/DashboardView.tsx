@@ -793,7 +793,7 @@ export function DashboardView({
                 />
 
                 <BreakdownBarList
-                  title="Where Visitors Came From"
+                  title="Before Dining With Us"
                   headerIcon={<MapPin className="w-4 h-4" aria-hidden="true" />}
                   items={originStats}
                   total={filteredResponses.length}
@@ -803,7 +803,7 @@ export function DashboardView({
                 />
 
                 <BreakdownBarList
-                  title="Where Visitors Are Heading Next"
+                  title="After Dining With Us"
                   headerIcon={<Compass className="w-4 h-4" aria-hidden="true" />}
                   items={destinationStats}
                   total={filteredResponses.length}
