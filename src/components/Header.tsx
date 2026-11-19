@@ -1,14 +1,16 @@
 import React from 'react';
-import { Check, Copy, Download } from 'lucide-react';
+import { Check, Copy, Download, Lock } from 'lucide-react';
 import { BrandLogo } from './Icons';
 
 export type AppView = 'survey' | 'dashboard' | 'responses';
 
 interface HeaderProps {
   activeView: AppView;
+  isLocked: boolean;
   onSelectView: (view: AppView) => void;
   onDownloadCsv: () => void;
   onCopySurveyLink: () => void;
+  onLockDashboard: () => void;
   copiedSurveyLink: boolean;
   responseCount: number;
   isDownloading: boolean;
@@ -16,16 +18,18 @@ interface HeaderProps {
 
 export function Header({
   activeView,
+  isLocked,
   onSelectView,
   onDownloadCsv,
   onCopySurveyLink,
+  onLockDashboard,
   copiedSurveyLink,
   responseCount,
   isDownloading,
 }: HeaderProps) {
-  if (activeView === 'survey') {
+  if (activeView === 'survey' || isLocked) {
     return (
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200">
+      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 print:hidden">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5 shrink-0">
             <BrandLogo sizeClass="w-9 h-9 sm:w-10 sm:h-10" />
@@ -34,7 +38,9 @@ export function Header({
             </span>
           </div>
           <span className="text-xs text-slate-500 whitespace-nowrap shrink-0">
-            Marketing Research Survey
+            {activeView === 'survey'
+              ? 'Marketing Research Survey'
+              : 'Protected Dashboard'}
           </span>
         </div>
       </header>
@@ -42,7 +48,7 @@ export function Header({
   }
 
   return (
-    <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200">
+    <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 print:hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-4 sm:gap-8">
         {/* Zone 1: Brand Wordmark & Logo */}
         <button
@@ -100,6 +106,14 @@ export function Header({
                 <span>Copy Survey Link</span>
               </>
             )}
+          </button>
+          <button
+            type="button"
+            onClick={onLockDashboard}
+            className="inline-flex items-center gap-1.5 py-1.5 border-b-2 border-transparent text-slate-500 hover:text-slate-900 transition-colors whitespace-nowrap shrink-0 min-h-[40px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+          >
+            <Lock className="w-3.5 h-3.5" aria-hidden="true" />
+            <span className="hidden sm:inline">Lock</span>
           </button>
         </nav>
 

@@ -3,7 +3,7 @@
 ## 1. Data Invariants
 1. **Explicit Consent Invariant**: A `SurveyResponse` document in `/surveys/{surveyId}` cannot be created unless `consent == 'Yes'`.
 2. **Path & Document ID Match**: The document ID `{surveyId}` must match `^[a-zA-Z0-9_\-]+$`, have length `<= 128`, and equal `request.resource.data.id`.
-3. **Strict Key & Volumetric Boundaries**: Every `SurveyResponse` document must contain strictly the 19 required keys defined in `firebase-blueprint.json` (`hasAll` and `hasOnly`), with every string and numeric field bounded (`name <= 80`, `origin <= 80`, `destination <= 80`, `paymentMethod <= 60`, `partySize >= 1 && partySize <= 50`, `spendEstimate >= 0 && spendEstimate <= 1000000`).
+3. **Strict Key & Volumetric Boundaries**: Every `SurveyResponse` document must contain the 19 required keys defined in `firebase-blueprint.json` (`hasAll`) and only allow the optional boolean `orderedTakeout` (`hasOnly`), with every string and numeric field bounded (`name <= 80`, `origin <= 80`, `destination <= 80`, `spendPerPax <= 80`, `paymentMethod <= 60`, `partySize >= 1 && partySize <= 50`, `spendEstimate >= 0 && spendEstimate <= 1000000`).
 4. **Immutability of Submitted Surveys**: Once submitted, survey responses cannot be mutated via `update` (`allow update: if false;`), preventing tampering or update-gap attacks.
 
 ## 2. The "Dirty Dozen" Payloads

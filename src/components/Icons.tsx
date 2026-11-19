@@ -243,9 +243,9 @@ export function SpendTierIcon({
   index: number;
   className?: string;
 }) {
-  if (index <= 1) return <Coins className={className} aria-hidden="true" />;
-  if (index <= 3) return <Banknote className={className} aria-hidden="true" />;
-  if (index === 4) return <Wallet className={className} aria-hidden="true" />;
+  if (index === 0) return <Coins className={className} aria-hidden="true" />;
+  if (index === 1) return <Flame className={className} aria-hidden="true" />;
+  if (index === 2) return <Coffee className={className} aria-hidden="true" />;
   return <Gem className={className} aria-hidden="true" />;
 }
 

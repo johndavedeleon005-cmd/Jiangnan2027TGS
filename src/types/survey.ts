@@ -65,6 +65,7 @@ export interface SurveyDraft {
   currency: CurrencyCode;
   spendBracket: string;
   customSpend: string;
+  orderedTakeout: boolean;
   paymentMethod: PaymentMethodOption | '';
   paymentOther: string;
 }
@@ -88,6 +89,7 @@ export interface SurveyResponse {
   currency: CurrencyCode;
   spendPerPax: string;
   spendEstimate: number;
+  orderedTakeout?: boolean;
   paymentMethod?: string;
 }
 
@@ -201,20 +203,38 @@ export const SPEND_BRACKETS: Record<
   { label: string; estimate: number; hint: string }[]
 > = {
   PHP: [
-    { label: 'Under ₱150', estimate: 120, hint: 'Quick snack or drink' },
-    { label: '₱150 – ₱300', estimate: 225, hint: 'Casual value meal' },
-    { label: '₱301 – ₱500', estimate: 400, hint: 'Standard dine-in' },
-    { label: '₱501 – ₱800', estimate: 650, hint: 'Full meal & drinks' },
-    { label: '₱801 – ₱1,200', estimate: 1000, hint: 'Special dining' },
-    { label: 'Over ₱1,200', estimate: 1500, hint: 'Premium experience' },
+    {
+      label: '699-799 Hotpot Only',
+      estimate: 749,
+      hint: '₱699 – ₱799 per pax · Unlimited hotpot dining package',
+    },
+    {
+      label: '899-999 Hotpot with Grill',
+      estimate: 949,
+      hint: '₱899 – ₱999 per pax · Unlimited hotpot & tabletop grill',
+    },
+    {
+      label: 'Hotpot with Ala Carte Drinks 699-899',
+      estimate: 799,
+      hint: '₱699 – ₱899 per pax · Hotpot + a la carte beverages',
+    },
   ],
   USD: [
-    { label: 'Under $10', estimate: 8, hint: 'Quick snack or drink' },
-    { label: '$10 – $20', estimate: 15, hint: 'Casual value meal' },
-    { label: '$21 – $35', estimate: 28, hint: 'Standard dine-in' },
-    { label: '$36 – $55', estimate: 45, hint: 'Full meal & drinks' },
-    { label: '$56 – $85', estimate: 70, hint: 'Special dining' },
-    { label: 'Over $85', estimate: 100, hint: 'Premium experience' },
+    {
+      label: '699-799 Hotpot Only',
+      estimate: 749,
+      hint: '₱699 – ₱799 per pax · Unlimited hotpot dining package',
+    },
+    {
+      label: '899-999 Hotpot with Grill',
+      estimate: 949,
+      hint: '₱899 – ₱999 per pax · Unlimited hotpot & tabletop grill',
+    },
+    {
+      label: 'Hotpot with Ala Carte Drinks 699-899',
+      estimate: 799,
+      hint: '₱699 – ₱899 per pax · Hotpot + a la carte beverages',
+    },
   ],
 };
 
@@ -283,6 +303,7 @@ export function buildSurveyCsv(responses: SurveyResponse[]): string {
     'Currency',
     'Budget Per Pax',
     'Estimated Spend Per Pax',
+    'Ordered for Takeout',
     'Preferred Mode of Payment',
   ];
 
@@ -317,6 +338,7 @@ export function buildSurveyCsv(responses: SurveyResponse[]): string {
       r.currency,
       r.spendPerPax,
       r.spendEstimate,
+      r.orderedTakeout ? 'Yes' : 'No',
       r.paymentMethod || 'Unspecified',
     ]
       .map(escapeCsvCell)

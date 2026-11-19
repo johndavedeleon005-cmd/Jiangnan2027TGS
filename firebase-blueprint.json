@@ -109,13 +109,17 @@
         },
         "spendPerPax": {
           "type": "string",
-          "description": "Formatted budget bracket or custom amount per person.",
+          "description": "Selected willingness to spend tier or package per person.",
           "minLength": 1,
-          "maxLength": 40
+          "maxLength": 80
         },
         "spendEstimate": {
           "type": "number",
           "description": "Numeric spend estimate per person."
+        },
+        "orderedTakeout": {
+          "type": "boolean",
+          "description": "Optional check indicating whether the respondent also ordered for takeout."
         },
         "paymentMethod": {
           "type": "string",

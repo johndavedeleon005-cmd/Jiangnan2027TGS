@@ -28,7 +28,6 @@ import {
   SPEND_BRACKETS,
   TRANSPORT_OPTIONS,
   getLocalDateString,
-  type CurrencyCode,
   type SurveyDraft,
   type SurveyResponse,
 } from '../types/survey';
@@ -68,6 +67,7 @@ const INITIAL_DRAFT: SurveyDraft = {
   currency: 'PHP',
   spendBracket: '',
   customSpend: '',
+  orderedTakeout: false,
   paymentMethod: '',
   paymentOther: '',
 };
@@ -161,9 +161,10 @@ const ALL_STEPS: StepMeta[] = [
   {
     id: 'spend',
     number: '12',
-    title: 'Budget per Pax',
+    title: 'Willingness to Spend',
     question: 'How much are you willing to spend per person?',
-    subtitle: 'Pick a range or enter an exact budget per pax.',
+    subtitle:
+      'Choose a dining package option below, and optionally check if you ordered for takeout too.',
   },
   {
     id: 'payment',
@@ -230,10 +231,8 @@ export function SurveyFlow({
         return draft.destination === 'Other'
           ? draft.destinationOther.trim().length > 0
           : Boolean(draft.destination);
-      case 'spend': {
-        const customNum = Number(draft.customSpend);
-        return Boolean(draft.spendBracket) || (draft.customSpend.trim().length > 0 && customNum > 0);
-      }
+      case 'spend':
+        return Boolean(draft.spendBracket);
       case 'payment':
         return draft.paymentMethod === 'Other'
           ? draft.paymentOther.trim().length > 0
@@ -280,11 +279,10 @@ export function SurveyFlow({
           ? draft.destinationOther.trim() || 'Other'
           : draft.destination;
       case 'spend': {
-        if (draft.customSpend.trim()) {
-          const sym = draft.currency === 'PHP' ? '₱' : '$';
-          return `${sym}${Number(draft.customSpend).toLocaleString()} / pax`;
-        }
-        return draft.spendBracket || null;
+        if (!draft.spendBracket) return null;
+        return draft.orderedTakeout
+          ? `${draft.spendBracket} (+ Takeout)`
+          : draft.spendBracket;
       }
       case 'payment':
         if (!draft.paymentMethod) return null;
@@ -323,20 +321,11 @@ export function SurveyFlow({
     const destinationFinal =
       draft.destination === 'Other' ? draft.destinationOther.trim() : draft.destination;
 
-    let spendPerPax = draft.spendBracket;
-    let spendEstimate = 0;
-
-    if (draft.customSpend.trim()) {
-      const numeric = Math.max(0, Number(draft.customSpend));
-      const sym = draft.currency === 'PHP' ? '₱' : '$';
-      spendPerPax = `${sym}${numeric.toLocaleString()}`;
-      spendEstimate = numeric;
-    } else {
-      const bracket = SPEND_BRACKETS[draft.currency].find(
-        (b) => b.label === draft.spendBracket
-      );
-      spendEstimate = bracket ? bracket.estimate : 0;
-    }
+    const spendPerPax = draft.spendBracket;
+    const bracket = SPEND_BRACKETS[draft.currency].find(
+      (b) => b.label === draft.spendBracket
+    );
+    const spendEstimate = bracket ? bracket.estimate : 0;
 
     const paymentFinal =
       draft.paymentMethod === 'Other'
@@ -360,6 +349,7 @@ export function SurveyFlow({
         currency: draft.currency,
         spendPerPax,
         spendEstimate,
+        orderedTakeout: draft.orderedTakeout,
         paymentMethod: paymentFinal,
         clientDate: getLocalDateString(new Date()),
       });
@@ -439,9 +429,10 @@ export function SurveyFlow({
               </span>
             </div>
             <div className="flex items-center justify-between py-2 border-b border-slate-100 sm:border-b-0">
-              <span className="text-slate-500">Budget / Pax</span>
-              <span className="font-medium text-red-600 font-mono tabular-nums">
+              <span className="text-slate-500">Willingness to Spend</span>
+              <span className="font-medium text-red-600 font-mono tabular-nums text-right">
                 {completedResponse.spendPerPax}
+                {completedResponse.orderedTakeout ? ' · +Takeout' : ''}
               </span>
             </div>
             <div className="flex items-center justify-between py-2 border-b border-slate-100 sm:border-b-0">
@@ -1377,39 +1368,9 @@ export function SurveyFlow({
 
               {currentStep.id === 'spend' && (
                 <div className="space-y-5">
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-xs font-medium text-slate-500">
-                      Select currency & bracket
-                    </span>
-                    <div className="inline-flex items-center p-1 bg-slate-100 rounded-lg">
-                      {(['PHP', 'USD'] as CurrencyCode[]).map((curr) => (
-                        <button
-                          key={curr}
-                          type="button"
-                          onClick={() =>
-                            setDraft((prev) => ({
-                              ...prev,
-                              currency: curr,
-                              spendBracket: '',
-                            }))
-                          }
-                          className={`px-3 py-1.5 text-xs font-mono font-semibold rounded-md transition-colors whitespace-nowrap ${
-                            draft.currency === curr
-                              ? 'bg-white text-slate-900 shadow-sm'
-                              : 'text-slate-600 hover:text-slate-900'
-                          }`}
-                        >
-                          {curr === 'PHP' ? '₱ PHP' : '$ USD'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {SPEND_BRACKETS[draft.currency].map((bracket, idx) => {
-                      const selected =
-                        draft.spendBracket === bracket.label &&
-                        !draft.customSpend.trim();
+                  <div className="grid grid-cols-1 gap-3">
+                    {SPEND_BRACKETS.PHP.map((bracket, idx) => {
+                      const selected = draft.spendBracket === bracket.label;
                       return (
                         <button
                           key={bracket.label}
@@ -1421,15 +1382,15 @@ export function SurveyFlow({
                               customSpend: '',
                             }))
                           }
-                          className={`min-h-[64px] p-4 rounded-xl border text-left flex items-center justify-between gap-3 transition-all active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${
+                          className={`min-h-[72px] p-4 rounded-xl border text-left flex items-center justify-between gap-3 transition-all active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${
                             selected
                               ? 'border-red-500 bg-red-50/70 text-slate-900'
                               : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-900'
                           }`}
                         >
-                          <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex items-center gap-3.5 min-w-0">
                             <div
-                              className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                              className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
                                 selected
                                   ? 'bg-red-500 text-white'
                                   : 'bg-slate-100 text-slate-600'
@@ -1438,10 +1399,10 @@ export function SurveyFlow({
                               <SpendTierIcon index={idx} className="w-5 h-5" />
                             </div>
                             <div className="min-w-0">
-                              <div className="text-sm font-semibold font-mono tabular-nums">
+                              <div className="text-sm sm:text-base font-semibold font-mono tabular-nums">
                                 {bracket.label}
                               </div>
-                              <div className="text-xs text-slate-500 truncate">
+                              <div className="text-xs text-slate-500 mt-0.5">
                                 {bracket.hint}
                               </div>
                             </div>
@@ -1457,31 +1418,50 @@ export function SurveyFlow({
                     })}
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1.5">
-                      Or enter an exact amount per pax ({draft.currency})
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono text-sm font-semibold text-slate-500">
-                        {draft.currency === 'PHP' ? '₱' : '$'}
-                      </span>
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        inputMode="numeric"
-                        value={draft.customSpend}
-                        onChange={(e) =>
-                          setDraft((prev) => ({
-                            ...prev,
-                            customSpend: e.target.value,
-                            spendBracket: e.target.value ? '' : prev.spendBracket,
-                          }))
-                        }
-                        placeholder="e.g. 450"
-                        className="w-full h-12 pl-9 pr-4 rounded-xl border border-slate-300 bg-white font-mono text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                      />
+                  {/* Optional Check: Ordered for Takeout Too */}
+                  <div className="pt-3 border-t border-slate-100">
+                    <div className="text-xs font-semibold text-slate-500 mb-2.5">
+                      Optional Add-On
                     </div>
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={draft.orderedTakeout}
+                      onClick={() =>
+                        setDraft((prev) => ({
+                          ...prev,
+                          orderedTakeout: !prev.orderedTakeout,
+                        }))
+                      }
+                      className={`w-full min-h-[68px] p-4 rounded-xl border text-left flex items-center justify-between gap-3 transition-all active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${
+                        draft.orderedTakeout
+                          ? 'border-red-500 bg-red-50/70 text-slate-900'
+                          : 'border-slate-200 bg-slate-50/60 hover:border-slate-300 hover:bg-slate-50 text-slate-900'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <div
+                          className={`w-6 h-6 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
+                            draft.orderedTakeout
+                              ? 'border-red-500 bg-red-500 text-white'
+                              : 'border-slate-300 bg-white text-transparent'
+                          }`}
+                        >
+                          <Check className="w-4 h-4" aria-hidden="true" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-slate-900">
+                            Ordered for takeout too
+                          </div>
+                          <div className="text-xs text-slate-500 mt-0.5">
+                            Optional — check this box if you also ordered food or drinks for takeout
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-xs font-mono font-medium text-slate-500 shrink-0">
+                        {draft.orderedTakeout ? 'Checked' : 'Optional'}
+                      </span>
+                    </button>
                   </div>
                 </div>
               )}

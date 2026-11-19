@@ -27,8 +27,9 @@ const VALID_PAYLOAD = {
   origin: 'Office',
   destination: 'Home',
   currency: 'PHP',
-  spendPerPax: '₱301 – ₱500',
-  spendEstimate: 400,
+  spendPerPax: '699-799 Hotpot Only',
+  spendEstimate: 749,
+  orderedTakeout: true,
   paymentMethod: 'E-Wallet (GCash / Maya)',
 };
 

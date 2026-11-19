@@ -7,6 +7,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Header, type AppView } from './components/Header';
 import { SurveyFlow } from './components/SurveyFlow';
 import { DashboardView } from './components/DashboardView';
+import { DashboardLockScreen } from './components/DashboardLockScreen';
 import {
   buildSurveyCsv,
   getLocalDateString,
@@ -45,8 +46,23 @@ function getHashForView(view: AppView): string {
   return '#/';
 }
 
+const DASHBOARD_PASSWORD = 'JiangNanTGS2027';
+const UNLOCK_STORAGE_KEY = 'jiangnan_dashboard_unlocked_v1';
+
+function readInitialUnlockState(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.sessionStorage.getItem(UNLOCK_STORAGE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
 export default function App() {
   const [activeView, setActiveView] = useState<AppView>(() => getViewFromLocation());
+  const [isDashboardUnlocked, setIsDashboardUnlocked] = useState<boolean>(() =>
+    readInitialUnlockState()
+  );
   const [responses, setResponses] = useState<SurveyResponse[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,7 +104,34 @@ export default function App() {
     }
   }, []);
 
+  const handleUnlockDashboard = useCallback((entered: string): boolean => {
+    if (entered === DASHBOARD_PASSWORD) {
+      setIsDashboardUnlocked(true);
+      try {
+        window.sessionStorage.setItem(UNLOCK_STORAGE_KEY, 'true');
+      } catch {
+        // Ignore storage restrictions
+      }
+      return true;
+    }
+    return false;
+  }, []);
+
+  const handleLockDashboard = useCallback(() => {
+    setIsDashboardUnlocked(false);
+    setResponses([]);
+    try {
+      window.sessionStorage.removeItem(UNLOCK_STORAGE_KEY);
+    } catch {
+      // Ignore storage restrictions
+    }
+  }, []);
+
   useEffect(() => {
+    if (!isDashboardUnlocked) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setError(null);
     const unsubscribe = subscribeToSurveyResponses(
@@ -105,7 +148,7 @@ export default function App() {
     return () => {
       unsubscribe();
     };
-  }, []);
+  }, [isDashboardUnlocked]);
 
   const handleSubmitted = (created: SurveyResponse) => {
     setResponses((prev) => {
@@ -174,13 +217,17 @@ export default function App() {
     }
   };
 
+  const isLocked = activeView !== 'survey' && !isDashboardUnlocked;
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
       <Header
         activeView={activeView}
+        isLocked={isLocked}
         onSelectView={navigateTo}
         onDownloadCsv={() => void handleDownloadLatestCsv()}
         onCopySurveyLink={() => void handleCopySurveyLink()}
+        onLockDashboard={handleLockDashboard}
         copiedSurveyLink={copiedSurveyLink}
         responseCount={responses.length}
         isDownloading={isDownloading}
@@ -189,6 +236,11 @@ export default function App() {
       <main className="flex-1">
         {activeView === 'survey' ? (
           <SurveyFlow onSubmitted={handleSubmitted} />
+        ) : !isDashboardUnlocked ? (
+          <DashboardLockScreen
+            onUnlock={handleUnlockDashboard}
+            onOpenSurvey={() => navigateTo('survey')}
+          />
         ) : (
           <DashboardView
             mode={activeView}

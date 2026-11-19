@@ -190,9 +190,10 @@ function sanitizeSurveyResponse(raw: Partial<SurveyResponse>): SurveyResponse {
       String(raw.destination || 'Other').trim().slice(0, 80) || 'Other',
     currency: raw.currency === 'USD' ? 'USD' : 'PHP',
     spendPerPax:
-      String(raw.spendPerPax || 'Unspecified').trim().slice(0, 40) ||
+      String(raw.spendPerPax || 'Unspecified').trim().slice(0, 80) ||
       'Unspecified',
     spendEstimate,
+    orderedTakeout: Boolean(raw.orderedTakeout),
     paymentMethod:
       String(raw.paymentMethod || 'Cash').trim().slice(0, 60) || 'Cash',
   };
@@ -296,6 +297,7 @@ export interface SubmitSurveyPayload {
   currency: CurrencyCode;
   spendPerPax: string;
   spendEstimate: number;
+  orderedTakeout?: boolean;
   paymentMethod: string;
   clientDate: string;
 }
@@ -334,6 +336,7 @@ export async function submitSurveyResponse(
     currency: payload.currency,
     spendPerPax: payload.spendPerPax,
     spendEstimate: payload.spendEstimate,
+    orderedTakeout: Boolean(payload.orderedTakeout),
     paymentMethod: payload.paymentMethod,
   });
 
