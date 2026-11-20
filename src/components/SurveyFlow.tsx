@@ -1,12 +1,14 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
+  Building2,
   Calendar,
   Check,
   ChevronLeft,
   ChevronRight,
   Clock,
   RotateCcw,
+  Search,
   User,
   Users,
   Minus,
@@ -16,9 +18,11 @@ import {
   ShieldCheck,
   ShieldOff,
   FileText,
+  X,
 } from 'lucide-react';
 import {
   AGE_GROUP_OPTIONS,
+  BRANCH_OPTIONS,
   COMPANION_OPTIONS,
   GENDER_OPTIONS,
   LOCATION_OPTIONS,
@@ -28,6 +32,7 @@ import {
   SPEND_BRACKETS,
   TRANSPORT_OPTIONS,
   getLocalDateString,
+  type BranchOption,
   type SurveyDraft,
   type SurveyResponse,
 } from '../types/survey';
@@ -46,12 +51,14 @@ import {
 } from './Icons';
 
 interface SurveyFlowProps {
+  initialBranch?: BranchOption | '';
   onSubmitted: (response: SurveyResponse) => void;
   onOpenDashboard?: () => void;
 }
 
 const INITIAL_DRAFT: SurveyDraft = {
   consent: '',
+  branch: '',
   name: '',
   gender: '',
   ageGroup: '',
@@ -89,78 +96,85 @@ const ALL_STEPS: StepMeta[] = [
     subtitle: 'Your responses will be used strictly for marketing research purposes.',
   },
   {
-    id: 'name',
+    id: 'branch',
     number: '02',
+    title: 'Branch',
+    question: 'Which Jiang Nan branch are you dining at today?',
+    subtitle: 'Select your Jiang Nan branch location from the list below.',
+  },
+  {
+    id: 'name',
+    number: '03',
     title: 'Your Name',
     question: 'What is your name?',
     subtitle: 'Optional — leave blank if you prefer to stay anonymous.',
   },
   {
     id: 'gender',
-    number: '03',
+    number: '04',
     title: 'Gender',
     question: 'How do you identify?',
     subtitle: 'Select the option that best describes you.',
   },
   {
     id: 'age',
-    number: '04',
+    number: '05',
     title: 'Age',
     question: 'What is your age?',
     subtitle: 'Tap one age range below.',
   },
   {
     id: 'occupation',
-    number: '05',
+    number: '06',
     title: 'Occupation',
     question: 'What is your current occupation status?',
     subtitle: 'Select whether you are a student, employed, or unemployed.',
   },
   {
     id: 'relationship',
-    number: '06',
+    number: '07',
     title: 'Relationship Status',
     question: 'What is your relationship status?',
     subtitle: 'Tap the option that applies to you.',
   },
   {
     id: 'companion',
-    number: '07',
+    number: '08',
     title: 'Dining Group',
     question: 'Are you dining solo, with friends, or with family?',
     subtitle: 'Tell us who is joining your table today.',
   },
   {
     id: 'partySize',
-    number: '08',
+    number: '09',
     title: 'Group Count',
     question: 'How many people are in your group?',
     subtitle: 'Include yourself in the total headcount (pax).',
   },
   {
     id: 'transport',
-    number: '09',
+    number: '10',
     title: 'Arrival Mode',
     question: 'How did you get here today?',
     subtitle: 'Choose whether you arrived by private vehicle or public transport.',
   },
   {
     id: 'origin',
-    number: '10',
+    number: '11',
     title: 'Before Dining',
     question: 'Where were you before you decided to dine with us?',
     subtitle: 'Select the place you were at before deciding to dine with us.',
   },
   {
     id: 'destination',
-    number: '11',
+    number: '12',
     title: 'After Dining',
     question: 'Where are you heading after dining with us?',
     subtitle: 'Select the place you plan to go after dining with us.',
   },
   {
     id: 'spend',
-    number: '12',
+    number: '13',
     title: 'Willingness to Spend',
     question: 'How much are you willing to spend per person?',
     subtitle:
@@ -168,7 +182,7 @@ const ALL_STEPS: StepMeta[] = [
   },
   {
     id: 'payment',
-    number: '13',
+    number: '14',
     title: 'Payment Mode',
     question: 'What is your preferred mode of payment?',
     subtitle: 'Select the payment option you prefer to use when dining.',
@@ -176,15 +190,32 @@ const ALL_STEPS: StepMeta[] = [
 ];
 
 export function SurveyFlow({
+  initialBranch = '',
   onSubmitted,
   onOpenDashboard,
 }: SurveyFlowProps) {
-  const [draft, setDraft] = useState<SurveyDraft>(INITIAL_DRAFT);
+  const [draft, setDraft] = useState<SurveyDraft>(() => ({
+    ...INITIAL_DRAFT,
+    branch: initialBranch || '',
+  }));
+  const [branchSearch, setBranchSearch] = useState('');
   const [stepIndex, setStepIndex] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [completedResponse, setCompletedResponse] = useState<SurveyResponse | null>(null);
   const [showPrivacyModal, setShowPrivacyModal] = useState(true);
+
+  useEffect(() => {
+    if (initialBranch) {
+      setDraft((prev) => (prev.branch ? prev : { ...prev, branch: initialBranch }));
+    }
+  }, [initialBranch]);
+
+  const filteredBranches = useMemo(() => {
+    const q = branchSearch.trim().toUpperCase();
+    if (!q) return BRANCH_OPTIONS;
+    return BRANCH_OPTIONS.filter((b) => b.includes(q));
+  }, [branchSearch]);
 
   const visibleSteps = useMemo(() => {
     if (draft.diningWith === 'Solo') {
@@ -209,6 +240,8 @@ export function SurveyFlow({
     switch (currentStep.id) {
       case 'consent':
         return draft.consent === 'Yes';
+      case 'branch':
+        return Boolean(draft.branch);
       case 'name':
         return true; // optional
       case 'gender':
@@ -246,6 +279,8 @@ export function SurveyFlow({
     switch (stepId) {
       case 'consent':
         return draft.consent === 'Yes' ? 'Consented' : null;
+      case 'branch':
+        return draft.branch || null;
       case 'name':
         return draft.name.trim() ? draft.name.trim() : null;
       case 'gender':
@@ -335,6 +370,7 @@ export function SurveyFlow({
     try {
       const created = await submitSurveyResponse({
         consent: draft.consent,
+        branch: draft.branch,
         name: draft.name.trim(),
         gender: draft.gender as SurveyResponse['gender'],
         ageGroup: draft.ageGroup as SurveyResponse['ageGroup'],
@@ -366,7 +402,11 @@ export function SurveyFlow({
   };
 
   const handleReset = () => {
-    setDraft(INITIAL_DRAFT);
+    setDraft({
+      ...INITIAL_DRAFT,
+      branch: initialBranch || '',
+    });
+    setBranchSearch('');
     setStepIndex(0);
     setErrorMsg(null);
     setCompletedResponse(null);
@@ -389,6 +429,7 @@ export function SurveyFlow({
             <div className="min-w-0">
               <p className="text-xs font-medium text-red-600 tracking-wide">
                 Response Recorded
+                {completedResponse.branch ? ` · ${completedResponse.branch}` : ''}
               </p>
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1 text-balance">
                 Thank you{completedResponse.name ? `, ${completedResponse.name}` : ''}.
@@ -404,6 +445,14 @@ export function SurveyFlow({
           </div>
 
           <div className="mt-8 pt-6 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+            {completedResponse.branch && (
+              <div className="flex items-center justify-between py-2 border-b border-slate-100 sm:border-b-0 sm:col-span-2">
+                <span className="text-slate-500">Branch</span>
+                <span className="font-semibold text-slate-900">
+                  {completedResponse.branch}
+                </span>
+              </div>
+            )}
             <div className="flex items-center justify-between py-2 border-b border-slate-100 sm:border-b-0">
               <span className="text-slate-500">Profile</span>
               <span className="font-medium text-slate-900">
@@ -815,6 +864,87 @@ export function SurveyFlow({
                       <span>Read Data Privacy Notice</span>
                     </button>
                   </div>
+                </div>
+              )}
+
+              {currentStep.id === 'branch' && (
+                <div className="space-y-4">
+                  <div className="relative">
+                    <Search
+                      className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                      aria-hidden="true"
+                    />
+                    <input
+                      type="text"
+                      value={branchSearch}
+                      onChange={(e) => setBranchSearch(e.target.value)}
+                      placeholder="Filter branches (e.g. Banawe, MOA, SM, Tagaytay)..."
+                      className="w-full h-11 pl-10 pr-9 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                    />
+                    {branchSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setBranchSearch('')}
+                        aria-label="Clear branch filter"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                      >
+                        <X className="w-4 h-4" aria-hidden="true" />
+                      </button>
+                    )}
+                  </div>
+
+                  {filteredBranches.length === 0 ? (
+                    <div className="p-6 rounded-xl border border-slate-200 bg-slate-50 text-center text-sm text-slate-500">
+                      No branches match &ldquo;{branchSearch}&rdquo;.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-[380px] overflow-y-auto pr-1">
+                      {filteredBranches.map((branchName) => {
+                        const selected = draft.branch === branchName;
+                        return (
+                          <button
+                            key={branchName}
+                            type="button"
+                            onClick={() =>
+                              setDraft((prev) => ({ ...prev, branch: branchName }))
+                            }
+                            className={`min-h-[54px] px-3.5 py-3 rounded-xl border text-left flex items-center justify-between gap-2.5 transition-all active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${
+                              selected
+                                ? 'border-red-500 bg-red-50/70 text-slate-900'
+                                : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-900'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span
+                                className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                                  selected
+                                    ? 'bg-red-500 text-white'
+                                    : 'bg-slate-100 text-slate-500'
+                                }`}
+                              >
+                                <Building2 className="w-4 h-4" aria-hidden="true" />
+                              </span>
+                              <span className="text-xs sm:text-sm font-semibold truncate">
+                                {branchName}
+                              </span>
+                            </div>
+                            {selected && (
+                              <Check
+                                className="w-4 h-4 text-red-600 shrink-0"
+                                aria-hidden="true"
+                              />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {initialBranch && draft.branch === initialBranch && (
+                    <p className="text-xs text-slate-500">
+                      Pre-selected from your branch survey link ({initialBranch}). You may change it above if needed.
+                    </p>
+                  )}
                 </div>
               )}
 

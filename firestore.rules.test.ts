@@ -14,6 +14,7 @@ const VALID_PAYLOAD = {
   id: 'SRV-TEST-0001',
   submittedAt: '2026-11-18T01:40:00.000Z',
   submittedDate: '2026-11-18',
+  branch: 'BANAWE',
   consent: 'Yes',
   name: 'Anonymous',
   gender: 'Female',
@@ -45,6 +46,6 @@ export const DIRTY_DOZEN_CASES: DirtyDozenCase[] = [
   { name: '8. Invalid gender enum', docId: 'SRV-TEST-0001', payload: { ...VALID_PAYLOAD, gender: 'Other' }, expectAllowed: false },
   { name: '9. Invalid transportMode enum', docId: 'SRV-TEST-0001', payload: { ...VALID_PAYLOAD, transportMode: 'Subway' }, expectAllowed: false },
   { name: '10. Negative spendEstimate', docId: 'SRV-TEST-0001', payload: { ...VALID_PAYLOAD, spendEstimate: -5 }, expectAllowed: false },
-  { name: '11. Empty origin string', docId: 'SRV-TEST-0001', payload: { ...VALID_PAYLOAD, origin: '' }, expectAllowed: false },
+  { name: '11. Invalid branch name', docId: 'SRV-TEST-0001', payload: { ...VALID_PAYLOAD, branch: 'INVALID BRANCH' }, expectAllowed: false },
   { name: '12. Empty paymentMethod string', docId: 'SRV-TEST-0001', payload: { ...VALID_PAYLOAD, paymentMethod: '' }, expectAllowed: false },
 ];

@@ -1,29 +1,50 @@
-import React, { useState } from 'react';
-import { ArrowRight, Eye, EyeOff, Lock } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ArrowRight, Building2, Eye, EyeOff, Lock } from 'lucide-react';
+import { BRANCH_OPTIONS, type BranchOption } from '../types/survey';
+import {
+  getDashboardAccountLabel,
+  type DashboardAccount,
+} from '../utils/dashboardAuth';
 import { BrandLogo } from './Icons';
 
 interface DashboardLockScreenProps {
-  onUnlock: (password: string) => boolean;
-  onOpenSurvey: () => void;
+  initialBranch?: BranchOption | '';
+  onUnlock: (account: DashboardAccount, password: string) => boolean;
+  onOpenSurvey: (branch?: BranchOption | null) => void;
 }
 
 export function DashboardLockScreen({
+  initialBranch = '',
   onUnlock,
   onOpenSurvey,
 }: DashboardLockScreenProps) {
+  const [selectedAccount, setSelectedAccount] = useState<DashboardAccount>(() =>
+    initialBranch ? initialBranch : 'HEAD_OFFICE'
+  );
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (initialBranch) {
+      setSelectedAccount(initialBranch);
+    }
+  }, [initialBranch]);
+
+  const accountLabel = getDashboardAccountLabel(selectedAccount);
+  const isHeadOffice = selectedAccount === 'HEAD_OFFICE';
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!password.trim()) {
-      setError('Please enter the dashboard password.');
+      setError(`Please enter the password for ${accountLabel}.`);
       return;
     }
-    const ok = onUnlock(password);
+    const ok = onUnlock(selectedAccount, password);
     if (!ok) {
-      setError('Incorrect password. Please try again.');
+      setError(
+        `Incorrect password for ${accountLabel}. Please check your password and try again.`
+      );
     } else {
       setError(null);
       setPassword('');
@@ -37,7 +58,7 @@ export function DashboardLockScreen({
           <BrandLogo sizeClass="w-11 h-11" />
           <div className="min-w-0">
             <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
-              Dashboard Access
+              Dashboard Sign In
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
               Jiang Nan Traffic Generation Survey
@@ -48,10 +69,50 @@ export function DashboardLockScreen({
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div>
             <label
+              htmlFor="dashboard-account"
+              className="block text-xs font-semibold text-slate-700 mb-1.5"
+            >
+              Select Branch or Head Office
+            </label>
+            <div className="relative">
+              <Building2
+                className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                aria-hidden="true"
+              />
+              <select
+                id="dashboard-account"
+                value={selectedAccount}
+                onChange={(e) => {
+                  setSelectedAccount(e.target.value as DashboardAccount);
+                  if (error) setError(null);
+                }}
+                className="w-full h-11 pl-10 pr-8 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
+              >
+                <optgroup label="Main Admin">
+                  <option value="HEAD_OFFICE">Head Office (All Branches)</option>
+                </optgroup>
+                <optgroup label="Jiang Nan Branches">
+                  {BRANCH_OPTIONS.map((branch) => (
+                    <option key={branch} value={branch}>
+                      {branch}
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+            </div>
+            <p className="mt-1.5 text-[11px] text-slate-500">
+              {isHeadOffice
+                ? 'Full access to the consolidated Head Office dashboard and all 21 branches.'
+                : `Restricted to ${selectedAccount} branch survey results only.`}
+            </p>
+          </div>
+
+          <div>
+            <label
               htmlFor="dashboard-password"
               className="block text-xs font-semibold text-slate-700 mb-1.5"
             >
-              Enter Password
+              Password for {accountLabel}
             </label>
             <div className="relative">
               <Lock
@@ -68,7 +129,11 @@ export function DashboardLockScreen({
                 }}
                 autoComplete="current-password"
                 autoFocus
-                placeholder="Enter dashboard password"
+                placeholder={
+                  isHeadOffice
+                    ? 'Enter Head Office password'
+                    : `Enter ${selectedAccount} password`
+                }
                 aria-invalid={Boolean(error)}
                 aria-describedby={error ? 'dashboard-password-error' : undefined}
                 className={`w-full h-11 pl-10 pr-11 rounded-xl border bg-slate-50 focus:bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-colors ${
@@ -105,7 +170,7 @@ export function DashboardLockScreen({
             type="submit"
             className="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
           >
-            Unlock Dashboard
+            Sign In to {accountLabel}
           </button>
         </form>
 
@@ -113,7 +178,9 @@ export function DashboardLockScreen({
           <span className="text-xs text-slate-500">Taking the customer survey?</span>
           <button
             type="button"
-            onClick={onOpenSurvey}
+            onClick={() =>
+              onOpenSurvey(isHeadOffice ? null : selectedAccount)
+            }
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-800 hover:text-red-600 transition-colors whitespace-nowrap"
           >
             <span>Open Survey</span>

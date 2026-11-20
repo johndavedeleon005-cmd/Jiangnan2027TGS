@@ -26,6 +26,34 @@
           "maxLength": 10,
           "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
         },
+        "branch": {
+          "type": "string",
+          "description": "Jiang Nan branch where the visitor dined.",
+          "enum": [
+            "BANAWE",
+            "BF HOMES",
+            "NU MOA",
+            "HOLY SPIRIT",
+            "HEMADY",
+            "PASEO CENTER",
+            "FAME MALL",
+            "SM EAST ORTIGAS",
+            "SM MARILAO",
+            "SM MARIKINA",
+            "SM FAIRVIEW",
+            "STA ROSA",
+            "SMDC TAGAYTAY",
+            "SM SUCAT",
+            "GIL FERNANDO",
+            "ORTIGAS CENTER",
+            "EASTWOOD CITY",
+            "SM CLARK",
+            "SM NORTH EDSA",
+            "GH PROMENADE",
+            "SOUTHMALL"
+          ],
+          "maxLength": 40
+        },
         "consent": {
           "type": "string",
           "description": "Explicit participant consent for marketing research.",

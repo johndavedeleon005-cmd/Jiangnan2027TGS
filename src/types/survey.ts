@@ -1,3 +1,43 @@
+export const BRANCH_OPTIONS = [
+  'BANAWE',
+  'BF HOMES',
+  'NU MOA',
+  'HOLY SPIRIT',
+  'HEMADY',
+  'PASEO CENTER',
+  'FAME MALL',
+  'SM EAST ORTIGAS',
+  'SM MARILAO',
+  'SM MARIKINA',
+  'SM FAIRVIEW',
+  'STA ROSA',
+  'SMDC TAGAYTAY',
+  'SM SUCAT',
+  'GIL FERNANDO',
+  'ORTIGAS CENTER',
+  'EASTWOOD CITY',
+  'SM CLARK',
+  'SM NORTH EDSA',
+  'GH PROMENADE',
+  'SOUTHMALL',
+] as const;
+
+export type BranchOption = (typeof BRANCH_OPTIONS)[number];
+
+export function isValidBranchOption(value: unknown): value is BranchOption {
+  return (
+    typeof value === 'string' &&
+    (BRANCH_OPTIONS as readonly string[]).includes(value)
+  );
+}
+
+export function normalizeBranchName(raw?: string | null): BranchOption | '' {
+  if (!raw) return '';
+  const cleaned = raw.trim().replace(/\s+/g, ' ').toUpperCase();
+  const match = BRANCH_OPTIONS.find((b) => b === cleaned);
+  return match ?? '';
+}
+
 export type GenderOption = 'Male' | 'Female' | 'Non-binary' | 'Prefer not to say';
 
 export type AgeGroupOption =
@@ -50,6 +90,7 @@ export type ConsentOption = 'Yes' | 'No';
 
 export interface SurveyDraft {
   consent: ConsentOption | '';
+  branch: BranchOption | '';
   name: string;
   gender: GenderOption | '';
   ageGroup: AgeGroupOption | '';
@@ -74,6 +115,7 @@ export interface SurveyResponse {
   id: string;
   submittedAt: string; // ISO timestamp
   submittedDate: string; // YYYY-MM-DD in local time of submission
+  branch?: BranchOption;
   consent?: ConsentOption;
   name: string; // empty string or 'Anonymous' displayed if omitted
   gender: GenderOption;
@@ -288,6 +330,7 @@ export function buildSurveyCsv(responses: SurveyResponse[]): string {
     'Date',
     'Time',
     'Submitted At (ISO)',
+    'Branch',
     'Marketing Research Consent',
     'Name',
     'Gender',
@@ -323,6 +366,7 @@ export function buildSurveyCsv(responses: SurveyResponse[]): string {
       r.submittedDate,
       timeStr,
       r.submittedAt,
+      r.branch || 'Unassigned',
       r.consent || 'Yes',
       r.name || 'Anonymous',
       r.gender,

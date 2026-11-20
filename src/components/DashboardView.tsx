@@ -1,11 +1,14 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ArrowLeft,
   ArrowRight,
   Banknote,
   Briefcase,
+  Building2,
   Calendar,
   Car,
   Check,
+  ChevronRight,
   ClipboardList,
   Compass,
   Copy,
@@ -14,6 +17,7 @@ import {
   ExternalLink,
   FileSpreadsheet,
   Heart,
+  Layers,
   Link2,
   MapPin,
   Printer,
@@ -37,9 +41,11 @@ import {
   YAxis,
 } from 'recharts';
 import {
+  BRANCH_OPTIONS,
   buildSurveyCsv,
   getLocalDateString,
   type AgeGroupOption,
+  type BranchOption,
   type GenderOption,
   type OccupationOption,
   type RelationshipStatusOption,
@@ -59,17 +65,21 @@ import {
 import { getCustomerSurveyUrl } from '../utils/surveyStorage';
 
 export type DatePreset = 'all' | 'today' | '7days' | 'custom';
+export type DashboardScope = 'all' | 'branch';
 
 interface DashboardViewProps {
   mode: 'dashboard' | 'responses';
+  initialBranch?: BranchOption | '';
+  lockedBranch?: BranchOption | null;
   responses: SurveyResponse[];
   isLoading: boolean;
   error: string | null;
   onRetry: () => void;
   onDeleteResponse: (id: string) => Promise<void>;
   onClearAll: () => Promise<void>;
-  onStartSurvey: () => void;
-  onCopySurveyLink: () => void;
+  onClearBranch: (branch: BranchOption) => Promise<void>;
+  onStartSurvey: (branch?: BranchOption | null) => void;
+  onCopySurveyLink: (branch?: BranchOption | null) => void;
   copiedSurveyLink: boolean;
   onDownloadCsv: (filtered: SurveyResponse[], filterLabel: string) => void;
   isDownloading: boolean;
@@ -198,18 +208,30 @@ function TrendTooltip({
 
 export function DashboardView({
   mode,
+  initialBranch = '',
+  lockedBranch = null,
   responses,
   isLoading,
   error,
   onRetry,
   onDeleteResponse,
   onClearAll,
+  onClearBranch,
   onStartSurvey,
   onCopySurveyLink,
   copiedSurveyLink,
   onDownloadCsv,
   isDownloading,
 }: DashboardViewProps) {
+  const isHeadOffice = !lockedBranch;
+  const [scope, setScope] = useState<DashboardScope>(() =>
+    lockedBranch || initialBranch ? 'branch' : 'all'
+  );
+  const [selectedBranch, setSelectedBranch] = useState<BranchOption>(
+    () => lockedBranch || initialBranch || BRANCH_OPTIONS[0]
+  );
+  const [branchPickerQuery, setBranchPickerQuery] = useState('');
+  const [showActiveBranchesOnly, setShowActiveBranchesOnly] = useState(false);
   const [datePreset, setDatePreset] = useState<DatePreset>('all');
   const [customDate, setCustomDate] = useState<string>(getLocalDateString(new Date()));
   const [searchQuery, setSearchQuery] = useState('');
@@ -217,6 +239,33 @@ export function DashboardView({
   const [showCsvPreview, setShowCsvPreview] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (lockedBranch) {
+      setScope('branch');
+      setSelectedBranch(lockedBranch);
+    } else if (initialBranch) {
+      setScope('branch');
+      setSelectedBranch(initialBranch);
+    }
+  }, [lockedBranch, initialBranch]);
+
+  const effectiveScope: DashboardScope = lockedBranch ? 'branch' : scope;
+  const activeBranch: BranchOption | null =
+    lockedBranch ?? (effectiveScope === 'branch' ? selectedBranch : null);
+
+  const handleOpenBranchDashboard = (branch: BranchOption) => {
+    if (lockedBranch) return;
+    setSelectedBranch(branch);
+    setScope('branch');
+    setConfirmClear(false);
+  };
+
+  const handleOpenWholeDashboard = () => {
+    if (lockedBranch) return;
+    setScope('all');
+    setConfirmClear(false);
+  };
 
   const todayStr = useMemo(() => getLocalDateString(new Date()), []);
   const todayReadable = useMemo(
@@ -236,7 +285,8 @@ export function DashboardView({
     return getLocalDateString(d);
   }, []);
 
-  const filteredResponses = useMemo(() => {
+  // Responses filtered by date & search (across all branches) — used for Whole Network branch summary table
+  const dateAndSearchFilteredAll = useMemo(() => {
     let list = [...responses];
 
     if (datePreset === 'today') {
@@ -251,6 +301,7 @@ export function DashboardView({
       const q = searchQuery.toLowerCase();
       list = list.filter(
         (r) =>
+          (r.branch || 'unassigned').toLowerCase().includes(q) ||
           (r.name || 'anonymous').toLowerCase().includes(q) ||
           r.gender.toLowerCase().includes(q) ||
           r.ageGroup.toLowerCase().includes(q) ||
@@ -267,6 +318,99 @@ export function DashboardView({
 
     return list;
   }, [responses, datePreset, customDate, searchQuery, todayStr, sevenDaysAgoStr]);
+
+  // All-time responses for the active scope (Whole vs Selected Branch)
+  const scopedAllResponses = useMemo(() => {
+    if (!activeBranch) return responses;
+    return responses.filter((r) => r.branch === activeBranch);
+  }, [responses, activeBranch]);
+
+  // Filtered responses for the active scope (Whole vs Selected Branch)
+  const filteredResponses = useMemo(() => {
+    if (!activeBranch) return dateAndSearchFilteredAll;
+    return dateAndSearchFilteredAll.filter((r) => r.branch === activeBranch);
+  }, [dateAndSearchFilteredAll, activeBranch]);
+
+  // Live all-time count per branch for the Branch Switcher pills/dropdown
+  const branchTotalCounts = useMemo(() => {
+    const counts = new Map<BranchOption, number>();
+    for (const b of BRANCH_OPTIONS) {
+      counts.set(b, 0);
+    }
+    for (const r of responses) {
+      if (r.branch && counts.has(r.branch)) {
+        counts.set(r.branch, (counts.get(r.branch) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [responses]);
+
+  const activeBranchesAllTimeCount = useMemo(() => {
+    let active = 0;
+    for (const b of BRANCH_OPTIONS) {
+      if ((branchTotalCounts.get(b) ?? 0) > 0) active += 1;
+    }
+    return active;
+  }, [branchTotalCounts]);
+
+  // Per-branch performance summary (for the Whole Network Dashboard)
+  const branchOverview = useMemo(() => {
+    const totalCount = dateAndSearchFilteredAll.length;
+    const rows = BRANCH_OPTIONS.map((branch) => {
+      const items = dateAndSearchFilteredAll.filter((r) => r.branch === branch);
+      const count = items.length;
+      const totalPax = items.reduce((acc, r) => acc + r.partySize, 0);
+      const avgPax = count > 0 ? (totalPax / count).toFixed(1) : '0.0';
+      const topSpend = countBy(items, (r) => r.spendPerPax)[0]?.label ?? '—';
+      const topTransport = countBy(items, (r) => r.transportMode)[0]?.label ?? '—';
+      const sharePct = totalCount > 0 ? Math.round((count / totalCount) * 100) : 0;
+      const latestDate = items[0]?.submittedDate ?? '—';
+
+      return {
+        branch,
+        count,
+        totalPax,
+        avgPax,
+        topSpend,
+        topTransport,
+        sharePct,
+        latestDate,
+      };
+    });
+
+    const unassignedItems = dateAndSearchFilteredAll.filter((r) => !r.branch);
+    const unassignedCount = unassignedItems.length;
+    const unassignedPax = unassignedItems.reduce((acc, r) => acc + r.partySize, 0);
+    const activeCount = rows.filter((row) => row.count > 0).length;
+
+    const sortedRows = [...rows].sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return BRANCH_OPTIONS.indexOf(a.branch) - BRANCH_OPTIONS.indexOf(b.branch);
+    });
+
+    return {
+      rows: sortedRows,
+      activeCount,
+      unassignedCount,
+      unassignedPax,
+      totalCount,
+    };
+  }, [dateAndSearchFilteredAll]);
+
+  const filteredOverviewRows = useMemo(() => {
+    const q = branchPickerQuery.trim().toUpperCase();
+    return branchOverview.rows.filter((row) => {
+      if (showActiveBranchesOnly && row.count === 0) return false;
+      if (q && !row.branch.includes(q)) return false;
+      return true;
+    });
+  }, [branchOverview.rows, showActiveBranchesOnly, branchPickerQuery]);
+
+  const filteredSwitcherBranches = useMemo(() => {
+    const q = branchPickerQuery.trim().toUpperCase();
+    if (!q) return BRANCH_OPTIONS;
+    return BRANCH_OPTIONS.filter((b) => b.includes(q));
+  }, [branchPickerQuery]);
 
   const metrics = useMemo(() => {
     const count = filteredResponses.length;
@@ -292,11 +436,12 @@ export function DashboardView({
   }, [filteredResponses]);
 
   const last7DaysTrend = useMemo(() => {
-    let source = responses;
+    let source = scopedAllResponses;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      source = responses.filter(
+      source = scopedAllResponses.filter(
         (r) =>
+          (r.branch || 'unassigned').toLowerCase().includes(q) ||
           (r.name || 'anonymous').toLowerCase().includes(q) ||
           r.gender.toLowerCase().includes(q) ||
           r.ageGroup.toLowerCase().includes(q) ||
@@ -357,7 +502,7 @@ export function DashboardView({
       peakDayLabel: peakPoint && peakPoint.submissions > 0 ? peakPoint.axisLabel : '—',
       peakCount: peakPoint ? peakPoint.submissions : 0,
     };
-  }, [responses, searchQuery]);
+  }, [scopedAllResponses, searchQuery]);
 
   const companionStats = useMemo(
     () => countBy(filteredResponses, (r) => r.diningWith),
@@ -423,7 +568,7 @@ export function DashboardView({
     [filteredResponses]
   );
 
-  const filterLabel =
+  const dateFilterSlug =
     datePreset === 'today'
       ? todayStr
       : datePreset === '7days'
@@ -431,6 +576,12 @@ export function DashboardView({
       : datePreset === 'custom'
       ? customDate
       : 'all-dates';
+
+  const branchSlug = activeBranch
+    ? activeBranch.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    : 'head-office';
+
+  const filterLabel = `${branchSlug}-${dateFilterSlug}`;
 
   const filterDisplayLabel =
     datePreset === 'today'
@@ -440,6 +591,10 @@ export function DashboardView({
       : datePreset === 'custom'
       ? customDate
       : 'All Dates';
+
+  const scopeDisplayLabel = activeBranch
+    ? `${activeBranch} Branch`
+    : 'Head Office (All Branches)';
 
   const handlePrintSummary = () => {
     const previousTitle = document.title;
@@ -497,13 +652,13 @@ export function DashboardView({
           <BrandLogo sizeClass="w-10 h-10" />
           <div>
             <div className="text-lg font-bold tracking-tight text-slate-900 leading-tight">
-              Jiang Nan —{' '}
+              Jiang Nan — {scopeDisplayLabel}{' '}
               {mode === 'dashboard'
-                ? 'Traffic Generation Analytics Summary'
-                : 'Survey Response Ledger'}
+                ? 'Analytics Summary'
+                : 'Response Ledger'}
             </div>
             <div className="text-xs text-slate-600 mt-0.5 flex items-center gap-2">
-              <span>Scope: {filterDisplayLabel}</span>
+              <span>Date Scope: {filterDisplayLabel}</span>
               {searchQuery.trim() && (
                 <>
                   <span aria-hidden="true">·</span>
@@ -523,10 +678,31 @@ export function DashboardView({
         </div>
       </div>
 
-      {/* Workspace Header & Date Toolbar */}
+      {/* Workspace Header & Primary Actions */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 print:hidden">
         <div>
           <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+            {isHeadOffice && activeBranch && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleOpenWholeDashboard}
+                  className="inline-flex items-center gap-1 font-medium text-red-600 hover:text-red-700 transition-colors"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Head Office</span>
+                </button>
+                <span aria-hidden="true">/</span>
+              </>
+            )}
+            {lockedBranch && (
+              <>
+                <span className="font-medium text-red-600">
+                  {lockedBranch} Branch View
+                </span>
+                <span aria-hidden="true">·</span>
+              </>
+            )}
             <span className="inline-flex items-center gap-1.5 font-medium text-slate-700">
               <Calendar className="w-3.5 h-3.5 text-red-600" aria-hidden="true" />
               <span>Today: {todayReadable}</span>
@@ -537,7 +713,13 @@ export function DashboardView({
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1 text-balance">
-            {mode === 'dashboard' ? 'Survey Analytics Dashboard' : 'Response Ledger'}
+            {activeBranch
+              ? mode === 'dashboard'
+                ? `${activeBranch} — Branch Dashboard`
+                : `${activeBranch} — Response Ledger`
+              : mode === 'dashboard'
+              ? 'Head Office — Whole Dashboard'
+              : 'Head Office — Response Ledger'}
           </h1>
         </div>
 
@@ -577,16 +759,173 @@ export function DashboardView({
 
           <button
             type="button"
-            onClick={onStartSurvey}
+            onClick={() => onStartSurvey(activeBranch)}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[40px] rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-medium transition-colors whitespace-nowrap"
           >
             <PlusCircle className="w-4 h-4" aria-hidden="true" />
-            <span>Open Survey</span>
+            <span>{activeBranch ? `Open ${activeBranch} Survey` : 'Open Survey'}</span>
           </button>
         </div>
       </div>
 
-      {/* Customer-Only Survey Link Strip */}
+      {/* Head Office Scope Switcher: Whole Network vs. Per Branch (Hidden for Branch Accounts) */}
+      {isHeadOffice && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-4 print:hidden">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div
+                role="tablist"
+                aria-label="Dashboard scope"
+                className="inline-flex items-center p-1 bg-slate-100 rounded-lg"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={effectiveScope === 'all'}
+                  onClick={handleOpenWholeDashboard}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors whitespace-nowrap min-h-[36px] ${
+                    effectiveScope === 'all'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Head Office (Whole)</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={effectiveScope === 'branch'}
+                  onClick={() => {
+                    setScope('branch');
+                    setConfirmClear(false);
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors whitespace-nowrap min-h-[36px] ${
+                    effectiveScope === 'branch'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Building2 className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Per Branch</span>
+                </button>
+              </div>
+
+              <div className="text-xs text-slate-500 font-mono tabular-nums flex items-center gap-2">
+                <span>{BRANCH_OPTIONS.length} branches</span>
+                <span aria-hidden="true">·</span>
+                <span>{activeBranchesAllTimeCount} with responses</span>
+              </div>
+            </div>
+
+            {/* Quick Jump Branch Selector */}
+            <div className="flex items-center gap-2">
+              <label
+                htmlFor="branch-quick-select"
+                className="text-xs font-medium text-slate-500 whitespace-nowrap"
+              >
+                Branch view:
+              </label>
+              <select
+                id="branch-quick-select"
+                value={effectiveScope === 'all' ? '__ALL__' : selectedBranch}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '__ALL__') {
+                    handleOpenWholeDashboard();
+                  } else {
+                    handleOpenBranchDashboard(val as BranchOption);
+                  }
+                }}
+                className="h-10 px-3 rounded-lg border border-slate-200 bg-slate-50 text-xs sm:text-sm font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-500 min-w-[220px]"
+              >
+                <option value="__ALL__">
+                  Head Office — All Branches ({responses.length})
+                </option>
+                {BRANCH_OPTIONS.map((branch) => (
+                  <option key={branch} value={branch}>
+                    {branch} ({branchTotalCounts.get(branch) ?? 0})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Per-Branch Interactive 21-Branch Switcher */}
+          {effectiveScope === 'branch' && (
+            <div className="pt-3 border-t border-slate-100 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="text-xs font-semibold text-slate-700">
+                  Select a Jiang Nan branch to view its dedicated dashboard
+                </div>
+                <div className="relative w-full sm:w-64">
+                  <Search
+                    className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                    aria-hidden="true"
+                  />
+                  <input
+                    type="text"
+                    value={branchPickerQuery}
+                    onChange={(e) => setBranchPickerQuery(e.target.value)}
+                    placeholder="Find branch..."
+                    className="w-full h-9 pl-8 pr-7 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                  {branchPickerQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setBranchPickerQuery('')}
+                      aria-label="Clear branch filter"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                    >
+                      <X className="w-3.5 h-3.5" aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {filteredSwitcherBranches.length === 0 ? (
+                <p className="text-xs text-slate-400 py-2">
+                  No branch matches &ldquo;{branchPickerQuery}&rdquo;.
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
+                  {filteredSwitcherBranches.map((branch) => {
+                    const isActive = selectedBranch === branch;
+                    const count = branchTotalCounts.get(branch) ?? 0;
+                    return (
+                      <button
+                        key={branch}
+                        type="button"
+                        onClick={() => handleOpenBranchDashboard(branch)}
+                        className={`px-3 py-2 min-h-[40px] rounded-lg border text-left flex items-center justify-between gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${
+                          isActive
+                            ? 'border-red-500 bg-red-500 text-white'
+                            : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 text-slate-800'
+                        }`}
+                      >
+                        <span className="text-xs font-semibold truncate">{branch}</span>
+                        <span
+                          className={`text-[11px] font-mono tabular-nums shrink-0 ${
+                            isActive
+                              ? 'text-red-100'
+                              : count > 0
+                              ? 'text-red-600 font-semibold'
+                              : 'text-slate-400'
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Customer-Only Survey Link Strip (Dynamic per active branch or general) */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 print:hidden">
         <div className="flex items-start sm:items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
@@ -594,10 +933,12 @@ export function DashboardView({
           </div>
           <div className="min-w-0">
             <div className="text-xs font-semibold text-slate-900">
-              Customer Survey Link (Dashboard hidden)
+              {activeBranch
+                ? `${activeBranch} Branch Survey Link (Auto-selects ${activeBranch})`
+                : 'Customer Survey Link (All Branches · Dashboard hidden)'}
             </div>
             <div className="text-xs font-mono text-slate-500 truncate mt-0.5">
-              {getCustomerSurveyUrl()}
+              {getCustomerSurveyUrl(activeBranch)}
             </div>
           </div>
         </div>
@@ -605,7 +946,7 @@ export function DashboardView({
         <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
-            onClick={onCopySurveyLink}
+            onClick={() => onCopySurveyLink(activeBranch)}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[40px] rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-medium text-slate-800 transition-colors whitespace-nowrap"
           >
             {copiedSurveyLink ? (
@@ -616,12 +957,16 @@ export function DashboardView({
             ) : (
               <>
                 <Copy className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
-                <span>Copy Survey Link</span>
+                <span>{activeBranch ? 'Copy Branch Link' : 'Copy Survey Link'}</span>
               </>
             )}
           </button>
           <a
-            href="#/survey"
+            href={
+              activeBranch
+                ? `#/survey?branch=${encodeURIComponent(activeBranch)}`
+                : '#/survey'
+            }
             className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[40px] rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition-colors whitespace-nowrap"
           >
             <span>Open Survey</span>
@@ -677,7 +1022,7 @@ export function DashboardView({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search name, mode, origin, payment..."
+            placeholder="Search branch, name, mode, origin..."
             className="w-full h-10 pl-9 pr-8 rounded-lg border border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-500"
           />
           {searchQuery && (
@@ -699,7 +1044,7 @@ export function DashboardView({
           <div className="flex items-center justify-between gap-4 pb-3 border-b border-slate-100">
             <div>
               <h2 className="text-sm font-bold text-slate-900">
-                Auto-Updated CSV Feed Preview
+                Auto-Updated CSV Feed Preview ({scopeDisplayLabel})
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
                 Updates automatically on every new submission. Press Download CSV to export.
@@ -755,27 +1100,60 @@ export function DashboardView({
           </div>
           <div className="bg-white border border-slate-200 rounded-2xl h-64 animate-pulse" />
         </div>
-      ) : responses.length === 0 ? (
-        /* Empty State */
+      ) : scopedAllResponses.length === 0 ? (
+        /* Empty State (Whole or Per-Branch) */
         <div className="bg-white border border-slate-200 rounded-2xl p-8 sm:p-14 text-center">
           <div className="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center mx-auto">
-            <ClipboardList className="w-6 h-6" aria-hidden="true" />
+            {activeBranch ? (
+              <Building2 className="w-6 h-6" aria-hidden="true" />
+            ) : (
+              <ClipboardList className="w-6 h-6" aria-hidden="true" />
+            )}
           </div>
           <h2 className="text-lg sm:text-xl font-bold text-slate-900 mt-4">
-            No survey responses recorded yet
+            {activeBranch
+              ? `No survey responses recorded for ${activeBranch} yet`
+              : 'No survey responses recorded yet'}
           </h2>
           <p className="text-sm text-slate-500 mt-1.5 max-w-md mx-auto">
-            Start taking visitor surveys to populate real-time transport, dining group,
-            journey, and budget insights with instant CSV export.
+            {activeBranch
+              ? `Share the ${activeBranch} branch survey link or log a response below to populate this branch's dedicated analytics.`
+              : 'Start taking visitor surveys across Jiang Nan branches to populate real-time traffic, dining group, journey, and budget insights.'}
           </p>
-          <button
-            type="button"
-            onClick={onStartSurvey}
-            className="mt-6 inline-flex items-center gap-2 px-5 py-3 min-h-[44px] rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors"
-          >
-            <PlusCircle className="w-4 h-4" aria-hidden="true" />
-            <span>Start First Survey</span>
-          </button>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => onStartSurvey(activeBranch)}
+              className="inline-flex items-center gap-2 px-5 py-3 min-h-[44px] rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors whitespace-nowrap"
+            >
+              <PlusCircle className="w-4 h-4" aria-hidden="true" />
+              <span>
+                {activeBranch ? `Start ${activeBranch} Survey` : 'Start First Survey'}
+              </span>
+            </button>
+            {activeBranch && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onCopySurveyLink(activeBranch)}
+                  className="inline-flex items-center gap-2 px-4 py-3 min-h-[44px] rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 text-sm font-medium transition-colors whitespace-nowrap"
+                >
+                  <Copy className="w-4 h-4 text-slate-500" aria-hidden="true" />
+                  <span>Copy Branch Link</span>
+                </button>
+                {isHeadOffice && (
+                  <button
+                    type="button"
+                    onClick={handleOpenWholeDashboard}
+                    className="inline-flex items-center gap-2 px-4 py-3 min-h-[44px] rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium transition-colors whitespace-nowrap"
+                  >
+                    <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+                    <span>Head Office</span>
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         </div>
       ) : (
         <>
@@ -783,12 +1161,15 @@ export function DashboardView({
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 print:grid-cols-4 print:gap-2.5 print-avoid-break">
             <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-xs text-slate-500">Survey Responses</div>
+                <div className="text-xs text-slate-500">
+                  {activeBranch ? `${activeBranch} Responses` : 'Total Responses'}
+                </div>
                 <div className="mt-2 text-2xl sm:text-3xl font-bold font-mono text-slate-900 tabular-nums">
                   {metrics.count}
                 </div>
                 <div className="mt-1 text-xs text-slate-500 font-mono tabular-nums">
-                  {metrics.totalPax} total guests
+                  {metrics.totalPax} guests
+                  {!activeBranch && ` · ${branchOverview.activeCount}/${BRANCH_OPTIONS.length} branches`}
                 </div>
               </div>
               <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
@@ -842,6 +1223,215 @@ export function DashboardView({
               </div>
             </div>
           </div>
+
+          {/* Whole Network: Branch Performance Overview (Head Office Only) */}
+          {isHeadOffice && effectiveScope === 'all' && mode === 'dashboard' && (
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden print-avoid-break print:rounded-xl print:border-slate-300">
+              <div className="px-5 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 print:px-4 print:py-3">
+                <div className="flex items-start sm:items-center gap-3 min-w-0">
+                  <span className="w-9 h-9 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+                    <Building2 className="w-4 h-4" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <h2 className="text-sm sm:text-base font-bold text-slate-900">
+                      Branch Performance Overview
+                    </h2>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500 mt-0.5 font-mono tabular-nums">
+                      <span>{BRANCH_OPTIONS.length} Jiang Nan branches</span>
+                      <span aria-hidden="true">·</span>
+                      <span>{branchOverview.activeCount} active in scope</span>
+                      <span aria-hidden="true">·</span>
+                      <span>Click any branch to open its dashboard</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 print:hidden">
+                  <div className="inline-flex items-center p-1 bg-slate-100 rounded-lg">
+                    <button
+                      type="button"
+                      onClick={() => setShowActiveBranchesOnly(false)}
+                      className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap min-h-[30px] ${
+                        !showActiveBranchesOnly
+                          ? 'bg-white text-slate-900 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      All 21 Branches
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowActiveBranchesOnly(true)}
+                      className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap min-h-[30px] ${
+                        showActiveBranchesOnly
+                          ? 'bg-white text-slate-900 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Active Only ({branchOverview.activeCount})
+                    </button>
+                  </div>
+
+                  <div className="relative w-44">
+                    <Search
+                      className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                      aria-hidden="true"
+                    />
+                    <input
+                      type="text"
+                      value={branchPickerQuery}
+                      onChange={(e) => setBranchPickerQuery(e.target.value)}
+                      placeholder="Filter branch..."
+                      className="w-full h-9 pl-8 pr-7 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                    />
+                    {branchPickerQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setBranchPickerQuery('')}
+                        aria-label="Clear branch filter"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                      >
+                        <X className="w-3.5 h-3.5" aria-hidden="true" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto print:overflow-visible">
+                <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
+                      <th className="py-2.5 px-4 whitespace-nowrap">Branch</th>
+                      <th className="py-2.5 px-4 whitespace-nowrap text-right">
+                        Responses
+                      </th>
+                      <th className="py-2.5 px-4 whitespace-nowrap w-40 hidden sm:table-cell">
+                        Network Share
+                      </th>
+                      <th className="py-2.5 px-4 whitespace-nowrap text-right">
+                        Guests (Pax)
+                      </th>
+                      <th className="py-2.5 px-4 whitespace-nowrap text-right hidden md:table-cell">
+                        Avg Pax
+                      </th>
+                      <th className="py-2.5 px-4 whitespace-nowrap hidden lg:table-cell">
+                        Top Spend Package
+                      </th>
+                      <th className="py-2.5 px-4 whitespace-nowrap text-right print:hidden">
+                        Dashboard
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredOverviewRows.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={7}
+                          className="py-8 px-4 text-center text-xs text-slate-500"
+                        >
+                          No branches match the current filter.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredOverviewRows.map((row) => (
+                        <tr
+                          key={row.branch}
+                          onClick={() => handleOpenBranchDashboard(row.branch)}
+                          className="hover:bg-slate-50/90 transition-colors cursor-pointer group"
+                        >
+                          <td className="py-2.5 px-4 whitespace-nowrap font-semibold text-slate-900">
+                            {row.branch}
+                          </td>
+                          <td className="py-2.5 px-4 whitespace-nowrap text-right font-mono tabular-nums">
+                            <span
+                              className={
+                                row.count > 0
+                                  ? 'font-semibold text-slate-900'
+                                  : 'text-slate-400'
+                              }
+                            >
+                              {row.count}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-4 whitespace-nowrap hidden sm:table-cell">
+                            <div className="flex items-center gap-2.5">
+                              <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-red-500 rounded-full transition-all duration-300"
+                                  style={{ width: `${row.sharePct}%` }}
+                                />
+                              </div>
+                              <span className="font-mono text-xs text-slate-500 tabular-nums w-9 text-right">
+                                {row.sharePct}%
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-4 whitespace-nowrap text-right font-mono text-slate-700 tabular-nums">
+                            {row.totalPax}
+                          </td>
+                          <td className="py-2.5 px-4 whitespace-nowrap text-right font-mono text-slate-600 tabular-nums hidden md:table-cell">
+                            {row.count > 0 ? row.avgPax : '—'}
+                          </td>
+                          <td className="py-2.5 px-4 whitespace-nowrap text-slate-600 font-mono text-xs hidden lg:table-cell truncate max-w-[240px]">
+                            {row.topSpend}
+                          </td>
+                          <td className="py-2.5 px-4 whitespace-nowrap text-right print:hidden">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenBranchDashboard(row.branch);
+                              }}
+                              className="inline-flex items-center gap-1 text-xs font-medium text-red-600 group-hover:text-red-700 whitespace-nowrap"
+                            >
+                              <span>View</span>
+                              <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+
+                    {branchOverview.unassignedCount > 0 && !branchPickerQuery.trim() && (
+                      <tr className="bg-slate-50/70 text-slate-500">
+                        <td className="py-2.5 px-4 whitespace-nowrap font-medium">
+                          Unassigned (Prior to Branch Tracking)
+                        </td>
+                        <td className="py-2.5 px-4 whitespace-nowrap text-right font-mono tabular-nums">
+                          {branchOverview.unassignedCount}
+                        </td>
+                        <td className="py-2.5 px-4 whitespace-nowrap hidden sm:table-cell font-mono text-xs text-slate-400">
+                          {branchOverview.totalCount > 0
+                            ? `${Math.round(
+                                (branchOverview.unassignedCount /
+                                  branchOverview.totalCount) *
+                                  100
+                              )}%`
+                            : '0%'}
+                        </td>
+                        <td className="py-2.5 px-4 whitespace-nowrap text-right font-mono tabular-nums">
+                          {branchOverview.unassignedPax}
+                        </td>
+                        <td className="py-2.5 px-4 whitespace-nowrap text-right font-mono tabular-nums hidden md:table-cell">
+                          {(
+                            branchOverview.unassignedPax /
+                            branchOverview.unassignedCount
+                          ).toFixed(1)}
+                        </td>
+                        <td className="py-2.5 px-4 whitespace-nowrap text-xs hidden lg:table-cell">
+                          Included in Whole totals
+                        </td>
+                        <td className="py-2.5 px-4 whitespace-nowrap text-right text-xs text-slate-400 print:hidden">
+                          —
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Summarized Icon Highlights & Detailed Breakdowns */}
           {mode === 'dashboard' && (
@@ -1250,24 +1840,32 @@ export function DashboardView({
             <div className="px-5 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 print:px-4 print:py-3">
               <div>
                 <h2 className="text-base font-bold text-slate-900">
-                  Recorded Submissions
+                  {activeBranch
+                    ? `${activeBranch} — Recorded Submissions`
+                    : 'Recorded Submissions (All Branches)'}
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5 tabular-nums">
-                  Showing {filteredResponses.length} of {responses.length} saved responses
+                  Showing {filteredResponses.length} of {scopedAllResponses.length} saved responses
                 </p>
               </div>
 
-              {responses.length > 0 && (
+              {isHeadOffice && scopedAllResponses.length > 0 && (
                 <div className="flex items-center gap-2 print:hidden">
                   {confirmClear ? (
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-red-700 font-medium">
-                        Clear all records?
+                        {activeBranch
+                          ? `Clear all ${activeBranch} records?`
+                          : 'Clear all records?'}
                       </span>
                       <button
                         type="button"
                         onClick={async () => {
-                          await onClearAll();
+                          if (activeBranch) {
+                            await onClearBranch(activeBranch);
+                          } else {
+                            await onClearAll();
+                          }
                           setConfirmClear(false);
                         }}
                         className="px-2.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-medium"
@@ -1288,7 +1886,7 @@ export function DashboardView({
                       onClick={() => setConfirmClear(true)}
                       className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-red-700 hover:bg-red-50 transition-colors"
                     >
-                      Reset Data
+                      {activeBranch ? `Clear ${activeBranch}` : 'Reset Data'}
                     </button>
                   )}
                 </div>
@@ -1307,6 +1905,9 @@ export function DashboardView({
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
                         <th className="py-3 px-4 whitespace-nowrap">Date & Time</th>
+                        {!activeBranch && (
+                          <th className="py-3 px-4 whitespace-nowrap">Branch</th>
+                        )}
                         <th className="py-3 px-4 whitespace-nowrap">Respondent</th>
                         <th className="py-3 px-4 whitespace-nowrap">Demographics</th>
                         <th className="py-3 px-4 whitespace-nowrap">Occupation & Status</th>
@@ -1317,9 +1918,11 @@ export function DashboardView({
                         <th className="py-3 px-4 text-right whitespace-nowrap">
                           Budget / Pax
                         </th>
-                        <th className="py-3 px-3 text-right whitespace-nowrap print:hidden">
-                          <span className="sr-only">Actions</span>
-                        </th>
+                        {isHeadOffice && (
+                          <th className="py-3 px-3 text-right whitespace-nowrap print:hidden">
+                            <span className="sr-only">Actions</span>
+                          </th>
+                        )}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -1333,6 +1936,23 @@ export function DashboardView({
                               {formatTime(r.submittedAt)}
                             </div>
                           </td>
+                          {!activeBranch && (
+                            <td className="py-3 px-4 whitespace-nowrap text-xs font-semibold text-slate-800">
+                              {r.branch ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenBranchDashboard(r.branch!)}
+                                  className="hover:text-red-600 transition-colors text-left"
+                                >
+                                  {r.branch}
+                                </button>
+                              ) : (
+                                <span className="text-slate-400 font-normal">
+                                  Unassigned
+                                </span>
+                              )}
+                            </td>
+                          )}
                           <td className="py-3 px-4 whitespace-nowrap font-medium text-slate-900">
                             {r.name || (
                               <span className="text-slate-400 font-normal">Anonymous</span>
@@ -1399,17 +2019,19 @@ export function DashboardView({
                               </div>
                             )}
                           </td>
-                          <td className="py-3 px-3 text-right whitespace-nowrap print:hidden">
-                            <button
-                              type="button"
-                              aria-label={`Delete response ${r.id}`}
-                              disabled={deletingId === r.id}
-                              onClick={() => void handleDelete(r.id)}
-                              className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
-                            >
-                              <Trash2 className="w-4 h-4" aria-hidden="true" />
-                            </button>
-                          </td>
+                          {isHeadOffice && (
+                            <td className="py-3 px-3 text-right whitespace-nowrap print:hidden">
+                              <button
+                                type="button"
+                                aria-label={`Delete response ${r.id}`}
+                                disabled={deletingId === r.id}
+                                onClick={() => void handleDelete(r.id)}
+                                className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
+                              >
+                                <Trash2 className="w-4 h-4" aria-hidden="true" />
+                              </button>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -1427,6 +2049,7 @@ export function DashboardView({
                           </div>
                           <div className="text-xs font-mono text-slate-500 tabular-nums mt-0.5">
                             {r.submittedDate} · {formatTime(r.submittedAt)}
+                            {!activeBranch && ` · ${r.branch || 'Unassigned'}`}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -1440,15 +2063,17 @@ export function DashboardView({
                               </div>
                             )}
                           </div>
-                          <button
-                            type="button"
-                            aria-label={`Delete response ${r.id}`}
-                            disabled={deletingId === r.id}
-                            onClick={() => void handleDelete(r.id)}
-                            className="p-2 -mr-2 rounded-lg text-slate-400 hover:text-red-600"
-                          >
-                            <Trash2 className="w-4 h-4" aria-hidden="true" />
-                          </button>
+                          {isHeadOffice && (
+                            <button
+                              type="button"
+                              aria-label={`Delete response ${r.id}`}
+                              disabled={deletingId === r.id}
+                              onClick={() => void handleDelete(r.id)}
+                              className="p-2 -mr-2 rounded-lg text-slate-400 hover:text-red-600"
+                            >
+                              <Trash2 className="w-4 h-4" aria-hidden="true" />
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -1501,7 +2126,7 @@ export function DashboardView({
 
           {/* Print-Only Footer */}
           <footer className="hidden print:flex items-center justify-between pt-3 border-t border-slate-200 text-[10px] text-slate-500 font-mono tabular-nums">
-            <span>Jiang Nan · Traffic Generation Survey Report</span>
+            <span>Jiang Nan · {scopeDisplayLabel} Traffic Generation Survey Report</span>
             <span>Generated {printedTimestamp}</span>
           </footer>
         </>

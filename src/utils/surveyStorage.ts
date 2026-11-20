@@ -12,7 +12,9 @@ import { db, handleFirestoreError, OperationType } from '../firebase';
 import {
   getLocalDateString,
   getTransportCategory,
+  normalizeBranchName,
   type AgeGroupOption,
+  type BranchOption,
   type CurrencyCode,
   type DiningCompanionOption,
   type GenderOption,
@@ -78,9 +80,10 @@ export function getBaseAppUrl(): string {
   return `${window.location.origin}${cleanPath}`;
 }
 
-export function getCustomerSurveyUrl(): string {
-  if (typeof window === 'undefined') return '#/survey';
-  return `${getBaseAppUrl()}#/survey`;
+export function getCustomerSurveyUrl(branch?: BranchOption | null): string {
+  const suffix = branch ? `?branch=${encodeURIComponent(branch)}` : '';
+  if (typeof window === 'undefined') return `#/survey${suffix}`;
+  return `${getBaseAppUrl()}#/survey${suffix}`;
 }
 
 function readLocalResponses(): SurveyResponse[] {
@@ -124,6 +127,8 @@ function sanitizeSurveyResponse(raw: Partial<SurveyResponse>): SurveyResponse {
     /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(raw.submittedDate)
       ? raw.submittedDate
       : getLocalDateString(now);
+
+  const normalizedBranch = normalizeBranchName(raw.branch);
 
   const gender: GenderOption = VALID_GENDERS.includes(
     raw.gender as GenderOption
@@ -171,7 +176,7 @@ function sanitizeSurveyResponse(raw: Partial<SurveyResponse>): SurveyResponse {
     Math.max(0, Math.round(Number(raw.spendEstimate) || 0))
   );
 
-  return {
+  const base: SurveyResponse = {
     id: safeId,
     submittedAt,
     submittedDate,
@@ -197,6 +202,12 @@ function sanitizeSurveyResponse(raw: Partial<SurveyResponse>): SurveyResponse {
     paymentMethod:
       String(raw.paymentMethod || 'Cash').trim().slice(0, 60) || 'Cash',
   };
+
+  if (normalizedBranch) {
+    base.branch = normalizedBranch;
+  }
+
+  return base;
 }
 
 function sortResponsesNewestFirst(items: SurveyResponse[]): SurveyResponse[] {
@@ -284,6 +295,7 @@ export async function loadSurveyResponses(): Promise<SurveyResponse[]> {
 
 export interface SubmitSurveyPayload {
   consent: 'Yes' | 'No' | '';
+  branch?: BranchOption | '';
   name: string;
   gender: SurveyResponse['gender'];
   ageGroup: SurveyResponse['ageGroup'];
@@ -321,6 +333,7 @@ export async function submitSurveyResponse(
     id,
     submittedAt: now.toISOString(),
     submittedDate: payload.clientDate || getLocalDateString(now),
+    branch: payload.branch || undefined,
     consent: 'Yes',
     name: payload.name,
     gender: payload.gender,
@@ -368,6 +381,27 @@ export async function clearAllSurveyResponses(): Promise<boolean> {
     const snapshot = await getDocs(surveysQuery);
     await Promise.all(
       snapshot.docs.map((docSnap) =>
+        deleteDoc(doc(db, COLLECTION_PATH, docSnap.id))
+      )
+    );
+    return true;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, COLLECTION_PATH);
+  }
+}
+
+export async function clearBranchSurveyResponses(branch: BranchOption): Promise<boolean> {
+  try {
+    const surveysQuery = query(
+      collection(db, COLLECTION_PATH),
+      where('consent', '==', 'Yes')
+    );
+    const snapshot = await getDocs(surveysQuery);
+    const branchDocs = snapshot.docs.filter(
+      (docSnap) => (docSnap.data() as SurveyResponse).branch === branch
+    );
+    await Promise.all(
+      branchDocs.map((docSnap) =>
         deleteDoc(doc(db, COLLECTION_PATH, docSnap.id))
       )
     );

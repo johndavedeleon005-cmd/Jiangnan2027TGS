@@ -113,7 +113,7 @@ export function Header({
             className="inline-flex items-center gap-1.5 py-1.5 border-b-2 border-transparent text-slate-500 hover:text-slate-900 transition-colors whitespace-nowrap shrink-0 min-h-[40px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
           >
             <Lock className="w-3.5 h-3.5" aria-hidden="true" />
-            <span className="hidden sm:inline">Lock</span>
+            <span className="hidden sm:inline">Sign Out</span>
           </button>
         </nav>
 
