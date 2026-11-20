@@ -8,11 +8,14 @@ import { Header, type AppView } from './components/Header';
 import { SurveyFlow } from './components/SurveyFlow';
 import { DashboardView } from './components/DashboardView';
 import { DashboardLockScreen } from './components/DashboardLockScreen';
+import { SurveyCodesView } from './components/SurveyCodesView';
 import {
   buildSurveyCsv,
   getLocalDateString,
   normalizeBranchName,
+  normalizeSurveyCode,
   type BranchOption,
+  type SurveyCodeRecord,
   type SurveyResponse,
 } from './types/survey';
 import {
@@ -29,6 +32,7 @@ import {
   loadSurveyResponses,
   subscribeToSurveyResponses,
 } from './utils/surveyStorage';
+import { subscribeToSurveyCodes } from './utils/surveyCodeStorage';
 
 function parseHashLocation(): { path: string; params: URLSearchParams } {
   if (typeof window === 'undefined') {
@@ -49,15 +53,18 @@ function getViewFromLocation(): AppView {
   const { path } = parseHashLocation();
   if (path === 'survey') return 'survey';
   if (path === 'responses') return 'responses';
+  if (path === 'codes') return 'codes';
 
   const params = new URLSearchParams(window.location.search);
   const queryView = (params.get('view') || '').toLowerCase();
   if (queryView === 'survey') return 'survey';
   if (queryView === 'responses') return 'responses';
+  if (queryView === 'codes') return 'codes';
 
   const cleanPath = window.location.pathname.replace(/\/+$/, '') || '/';
   if (cleanPath.endsWith('/survey')) return 'survey';
   if (cleanPath.endsWith('/responses')) return 'responses';
+  if (cleanPath.endsWith('/codes')) return 'codes';
   return 'dashboard';
 }
 
@@ -71,10 +78,21 @@ function getBranchFromLocation(): BranchOption | '' {
   return normalizeBranchName(searchParams.get('branch'));
 }
 
+function getCodeFromLocation(): string {
+  if (typeof window === 'undefined') return '';
+  const { params: hashParams } = parseHashLocation();
+  const fromHash = normalizeSurveyCode(hashParams.get('code'));
+  if (fromHash) return fromHash;
+
+  const searchParams = new URLSearchParams(window.location.search);
+  return normalizeSurveyCode(searchParams.get('code'));
+}
+
 function getHashForView(view: AppView, branch?: BranchOption | null): string {
   const branchQuery = branch ? `?branch=${encodeURIComponent(branch)}` : '';
   if (view === 'survey') return `#/survey${branchQuery}`;
   if (view === 'responses') return `#/responses${branchQuery}`;
+  if (view === 'codes') return '#/codes';
   return `#/${branchQuery}`;
 }
 
@@ -83,15 +101,20 @@ export default function App() {
   const [urlBranch, setUrlBranch] = useState<BranchOption | ''>(() =>
     getBranchFromLocation()
   );
+  const [urlCode, setUrlCode] = useState<string>(() => getCodeFromLocation());
   const [authenticatedAccount, setAuthenticatedAccount] =
     useState<DashboardAccount | null>(() => readStoredDashboardAccount());
   const [responses, setResponses] = useState<SurveyResponse[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [surveyCodes, setSurveyCodes] = useState<SurveyCodeRecord[]>([]);
+  const [isLoadingCodes, setIsLoadingCodes] = useState<boolean>(false);
+  const [codesError, setCodesError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
   const [copiedSurveyLink, setCopiedSurveyLink] = useState<boolean>(false);
 
   const isDashboardUnlocked = authenticatedAccount !== null;
+  const isHeadOffice = authenticatedAccount === 'HEAD_OFFICE';
   const lockedBranch: BranchOption | null =
     authenticatedAccount && authenticatedAccount !== 'HEAD_OFFICE'
       ? authenticatedAccount
@@ -101,6 +124,7 @@ export default function App() {
     const syncView = () => {
       setActiveView(getViewFromLocation());
       setUrlBranch(getBranchFromLocation());
+      setUrlCode(getCodeFromLocation());
     };
     window.addEventListener('hashchange', syncView);
     window.addEventListener('popstate', syncView);
@@ -117,6 +141,9 @@ export default function App() {
     }
     setActiveView(view);
     setUrlBranch(branch || '');
+    if (view !== 'survey') {
+      setUrlCode('');
+    }
   }, []);
 
   const fetchResponses = useCallback(async () => {
@@ -149,6 +176,8 @@ export default function App() {
   const handleLockDashboard = useCallback(() => {
     setAuthenticatedAccount(null);
     setResponses([]);
+    setSurveyCodes([]);
+    setCodesError(null);
     saveStoredDashboardAccount(null);
   }, []);
 
@@ -174,6 +203,40 @@ export default function App() {
       unsubscribe();
     };
   }, [isDashboardUnlocked]);
+
+  useEffect(() => {
+    if (!isHeadOffice) {
+      setSurveyCodes([]);
+      setIsLoadingCodes(false);
+      setCodesError(null);
+      if (isDashboardUnlocked && activeView === 'codes') {
+        navigateTo('dashboard', lockedBranch);
+      }
+      return;
+    }
+
+    setIsLoadingCodes(true);
+    setCodesError(null);
+    const unsubscribe = subscribeToSurveyCodes(
+      (items) => {
+        setSurveyCodes(items);
+        setIsLoadingCodes(false);
+        setCodesError(null);
+      },
+      (err) => {
+        setCodesError(err.message || 'Unable to load survey codes.');
+        setIsLoadingCodes(false);
+      }
+    );
+    return () => {
+      unsubscribe();
+    };
+  }, [isHeadOffice, isDashboardUnlocked, activeView, lockedBranch, navigateTo]);
+
+  const activeCodeCount = useMemo(
+    () => surveyCodes.filter((c) => c.status === 'active').length,
+    [surveyCodes]
+  );
 
   const visibleResponses = useMemo(() => {
     if (!lockedBranch) return responses;
@@ -268,7 +331,12 @@ export default function App() {
       <Header
         activeView={activeView}
         isLocked={isLocked}
-        onSelectView={(view) => navigateTo(view, lockedBranch)}
+        isHeadOffice={isHeadOffice}
+        activeCodeCount={activeCodeCount}
+        onSelectView={(view) => {
+          if (view === 'codes' && !isHeadOffice) return;
+          navigateTo(view, view === 'codes' ? null : lockedBranch);
+        }}
         onDownloadCsv={() => void handleDownloadLatestCsv()}
         onCopySurveyLink={() => void handleCopySurveyLink(lockedBranch)}
         onLockDashboard={handleLockDashboard}
@@ -281,6 +349,7 @@ export default function App() {
         {activeView === 'survey' ? (
           <SurveyFlow
             initialBranch={urlBranch}
+            initialCode={urlCode}
             onSubmitted={handleSubmitted}
           />
         ) : !isDashboardUnlocked ? (
@@ -289,9 +358,15 @@ export default function App() {
             onUnlock={handleUnlockDashboard}
             onOpenSurvey={(branch) => navigateTo('survey', branch)}
           />
+        ) : activeView === 'codes' && isHeadOffice ? (
+          <SurveyCodesView
+            codes={surveyCodes}
+            isLoading={isLoadingCodes}
+            error={codesError}
+          />
         ) : (
           <DashboardView
-            mode={activeView}
+            mode={activeView === 'responses' ? 'responses' : 'dashboard'}
             initialBranch={lockedBranch ?? urlBranch}
             lockedBranch={lockedBranch}
             responses={visibleResponses}
@@ -312,6 +387,10 @@ export default function App() {
               void handleDownloadLatestCsv(filtered, label)
             }
             isDownloading={isDownloading}
+            onOpenSurveyCodes={
+              isHeadOffice ? () => navigateTo('codes') : undefined
+            }
+            activeCodeCount={activeCodeCount}
           />
         )}
       </main>

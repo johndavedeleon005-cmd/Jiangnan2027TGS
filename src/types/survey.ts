@@ -93,8 +93,37 @@ export type VisitFrequencyOption = 'First Time' | '2nd Time' | '3 or More Times'
 
 export type OnlineSoloAwarenessOption = 'Yes' | 'No';
 
+export type SurveyCodeStatus = 'active' | 'used' | 'revoked';
+
+export interface SurveyCodeRecord {
+  code: string;
+  status: SurveyCodeStatus;
+  createdAt: string;
+  createdDate: string;
+  createdBy: string;
+  branch?: BranchOption;
+  note?: string;
+  usedAt?: string;
+  usedByResponseId?: string;
+}
+
+export function normalizeSurveyCode(raw?: string | null): string {
+  if (!raw) return '';
+  return raw
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^A-Z0-9_-]/g, '')
+    .slice(0, 32);
+}
+
+export function isValidSurveyCodeFormat(code: string): boolean {
+  return /^[A-Z0-9_-]{4,32}$/.test(code);
+}
+
 export interface SurveyDraft {
   consent: ConsentOption | '';
+  surveyCode: string;
   branch: BranchOption | '';
   name: string;
   gender: GenderOption | '';
@@ -121,6 +150,7 @@ export interface SurveyResponse {
   id: string;
   submittedAt: string; // ISO timestamp
   submittedDate: string; // YYYY-MM-DD in local time of submission
+  surveyCode?: string;
   branch?: BranchOption;
   consent?: ConsentOption;
   name: string; // empty string or 'Anonymous' displayed if omitted
@@ -363,6 +393,7 @@ export function escapeCsvCell(value: string | number): string {
 export function buildSurveyCsv(responses: SurveyResponse[]): string {
   const headers = [
     'Response ID',
+    'Survey Code',
     'Date',
     'Time',
     'Submitted At (ISO)',
@@ -400,6 +431,7 @@ export function buildSurveyCsv(responses: SurveyResponse[]): string {
 
     return [
       r.id,
+      r.surveyCode || 'Legacy',
       r.submittedDate,
       timeStr,
       r.submittedAt,

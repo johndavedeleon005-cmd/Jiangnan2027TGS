@@ -1,6 +1,6 @@
 /**
- * Security Rules Verification Suite for /surveys/{surveyId}
- * Verifies all Dirty Dozen payloads are rejected by the SurveyResponse blueprint.
+ * Security Rules Verification Suite for /surveys/{surveyId} & /surveyCodes/{codeId}
+ * Verifies all Dirty Dozen payloads are rejected by the blueprint and single-use invariants.
  */
 
 export interface DirtyDozenCase {
@@ -14,6 +14,7 @@ const VALID_PAYLOAD = {
   id: 'SRV-TEST-0001',
   submittedAt: '2026-11-18T01:40:00.000Z',
   submittedDate: '2026-11-18',
+  surveyCode: 'JN-TEST-1001',
   branch: 'BANAWE',
   consent: 'Yes',
   name: 'Anonymous',
@@ -37,13 +38,14 @@ const VALID_PAYLOAD = {
 };
 
 export const DIRTY_DOZEN_CASES: DirtyDozenCase[] = [
-  { name: 'Valid survey submission', docId: 'SRV-TEST-0001', payload: VALID_PAYLOAD, expectAllowed: true },
+  { name: 'Valid survey submission (with active single-use code)', docId: 'SRV-TEST-0001', payload: VALID_PAYLOAD, expectAllowed: true },
   {
     name: 'Valid Walked Only submission',
     docId: 'SRV-TEST-0002',
     payload: {
       ...VALID_PAYLOAD,
       id: 'SRV-TEST-0002',
+      surveyCode: 'JN-TEST-1002',
       transportCategory: 'On Foot',
       transportMode: 'Walked Only',
     },
@@ -63,4 +65,6 @@ export const DIRTY_DOZEN_CASES: DirtyDozenCase[] = [
   { name: '12. Empty paymentMethod string', docId: 'SRV-TEST-0001', payload: { ...VALID_PAYLOAD, paymentMethod: '' }, expectAllowed: false },
   { name: '13. Invalid awareOnlineSoloMeal enum', docId: 'SRV-TEST-0001', payload: { ...VALID_PAYLOAD, awareOnlineSoloMeal: 'Maybe' }, expectAllowed: false },
   { name: '14. Invalid visitFrequency enum', docId: 'SRV-TEST-0001', payload: { ...VALID_PAYLOAD, visitFrequency: '10th Time' }, expectAllowed: false },
+  { name: '15. Missing surveyCode', docId: 'SRV-TEST-0001', payload: { ...VALID_PAYLOAD, surveyCode: '' }, expectAllowed: false },
+  { name: '16. Invalid lowercase/symbols in surveyCode', docId: 'SRV-TEST-0001', payload: { ...VALID_PAYLOAD, surveyCode: 'bad code!' }, expectAllowed: false },
 ];

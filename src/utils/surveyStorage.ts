@@ -5,6 +5,7 @@ import {
   getDocs,
   onSnapshot,
   query,
+  runTransaction,
   setDoc,
   where,
 } from 'firebase/firestore';
@@ -12,7 +13,9 @@ import { db, handleFirestoreError, OperationType } from '../firebase';
 import {
   getLocalDateString,
   getTransportCategory,
+  isValidSurveyCodeFormat,
   normalizeBranchName,
+  normalizeSurveyCode,
   type AgeGroupOption,
   type BranchOption,
   type CurrencyCode,
@@ -21,6 +24,7 @@ import {
   type OccupationOption,
   type OnlineSoloAwarenessOption,
   type RelationshipStatusOption,
+  type SurveyCodeRecord,
   type SurveyResponse,
   type TransportModeOption,
   type VisitFrequencyOption,
@@ -28,6 +32,7 @@ import {
 
 const LOCAL_STORAGE_KEY = 'jiangnan_survey_responses_v1';
 const COLLECTION_PATH = 'surveys';
+const SURVEY_CODES_COLLECTION = 'surveyCodes';
 
 const VALID_GENDERS: GenderOption[] = [
   'Male',
@@ -216,6 +221,11 @@ function sanitizeSurveyResponse(raw: Partial<SurveyResponse>): SurveyResponse {
     base.branch = normalizedBranch;
   }
 
+  const normalizedCode = normalizeSurveyCode(raw.surveyCode);
+  if (isValidSurveyCodeFormat(normalizedCode)) {
+    base.surveyCode = normalizedCode;
+  }
+
   if (raw.awareOnlineSoloMeal === 'Yes' || raw.awareOnlineSoloMeal === 'No') {
     base.awareOnlineSoloMeal = raw.awareOnlineSoloMeal;
   }
@@ -247,8 +257,11 @@ export async function migrateExistingLocalResponses(): Promise<void> {
 
   try {
     for (const item of localItems) {
+      const clean = sanitizeSurveyResponse(item);
+      if (!clean.surveyCode) {
+        continue;
+      }
       try {
-        const clean = sanitizeSurveyResponse(item);
         await setDoc(doc(db, COLLECTION_PATH, clean.id), clean);
       } catch {
         remaining.push(item);
@@ -314,6 +327,7 @@ export async function loadSurveyResponses(): Promise<SurveyResponse[]> {
 
 export interface SubmitSurveyPayload {
   consent: 'Yes' | 'No' | '';
+  surveyCode: string;
   branch?: BranchOption | '';
   name: string;
   gender: SurveyResponse['gender'];
@@ -342,7 +356,10 @@ export async function submitSurveyResponse(
     throw new Error('Participant consent is required to submit.');
   }
 
-  void migrateExistingLocalResponses();
+  const normalizedCode = normalizeSurveyCode(payload.surveyCode);
+  if (!isValidSurveyCodeFormat(normalizedCode)) {
+    throw new Error('A valid activated survey code is required to submit.');
+  }
 
   const now = new Date();
   const id = `SRV-${now.getTime().toString(36).toUpperCase()}-${Math.random()
@@ -354,6 +371,7 @@ export async function submitSurveyResponse(
     id,
     submittedAt: now.toISOString(),
     submittedDate: payload.clientDate || getLocalDateString(now),
+    surveyCode: normalizedCode,
     branch: payload.branch || undefined,
     consent: 'Yes',
     name: payload.name,
@@ -378,9 +396,44 @@ export async function submitSurveyResponse(
 
   const docPath = `${COLLECTION_PATH}/${entry.id}`;
   try {
-    await setDoc(doc(db, COLLECTION_PATH, entry.id), entry);
+    await runTransaction(db, async (transaction) => {
+      const codeRef = doc(db, SURVEY_CODES_COLLECTION, normalizedCode);
+      const codeSnap = await transaction.get(codeRef);
+      if (!codeSnap.exists()) {
+        throw new Error(
+          'Survey code not found. Please request an active code from Head Office.'
+        );
+      }
+      const codeData = codeSnap.data() as SurveyCodeRecord;
+      if (codeData.status === 'used') {
+        throw new Error(
+          'This survey code has already been used. Each survey code can only be used once.'
+        );
+      }
+      if (codeData.status !== 'active') {
+        throw new Error(
+          'This survey code has been deactivated and can no longer be used.'
+        );
+      }
+
+      const surveyRef = doc(db, COLLECTION_PATH, entry.id);
+      transaction.set(surveyRef, entry);
+      transaction.update(codeRef, {
+        status: 'used',
+        usedAt: entry.submittedAt,
+        usedByResponseId: entry.id,
+      });
+    });
+
     return entry;
   } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('survey code') ||
+        error.message.includes('Survey code'))
+    ) {
+      throw error;
+    }
     handleFirestoreError(error, OperationType.CREATE, docPath);
   }
 }

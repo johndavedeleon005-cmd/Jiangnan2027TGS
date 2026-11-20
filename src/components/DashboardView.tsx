@@ -17,6 +17,7 @@ import {
   ExternalLink,
   FileSpreadsheet,
   Heart,
+  KeyRound,
   Layers,
   Link2,
   MapPin,
@@ -88,6 +89,8 @@ interface DashboardViewProps {
   copiedSurveyLink: boolean;
   onDownloadCsv: (filtered: SurveyResponse[], filterLabel: string) => void;
   isDownloading: boolean;
+  onOpenSurveyCodes?: () => void;
+  activeCodeCount?: number;
 }
 
 function BreakdownBarList({
@@ -227,6 +230,8 @@ export function DashboardView({
   copiedSurveyLink,
   onDownloadCsv,
   isDownloading,
+  onOpenSurveyCodes,
+  activeCodeCount = 0,
 }: DashboardViewProps) {
   const isHeadOffice = !lockedBranch;
   const [scope, setScope] = useState<DashboardScope>(() =>
@@ -307,6 +312,7 @@ export function DashboardView({
       list = list.filter(
         (r) =>
           (r.branch || 'unassigned').toLowerCase().includes(q) ||
+          (r.surveyCode || '').toLowerCase().includes(q) ||
           (r.name || 'anonymous').toLowerCase().includes(q) ||
           r.gender.toLowerCase().includes(q) ||
           r.ageGroup.toLowerCase().includes(q) ||
@@ -448,6 +454,7 @@ export function DashboardView({
       source = scopedAllResponses.filter(
         (r) =>
           (r.branch || 'unassigned').toLowerCase().includes(q) ||
+          (r.surveyCode || '').toLowerCase().includes(q) ||
           (r.name || 'anonymous').toLowerCase().includes(q) ||
           r.gender.toLowerCase().includes(q) ||
           r.ageGroup.toLowerCase().includes(q) ||
@@ -735,6 +742,19 @@ export function DashboardView({
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          {isHeadOffice && onOpenSurveyCodes && (
+            <button
+              type="button"
+              onClick={onOpenSurveyCodes}
+              className="inline-flex items-center gap-2 px-3.5 py-2 min-h-[40px] rounded-lg border border-red-200 bg-red-50/80 hover:bg-red-100/80 text-xs sm:text-sm font-semibold text-red-700 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+            >
+              <KeyRound className="w-4 h-4 text-red-600" aria-hidden="true" />
+              <span>Survey Codes</span>
+              <span className="font-mono text-xs text-red-600 tabular-nums">
+                ({activeCodeCount})
+              </span>
+            </button>
+          )}
           <button
             type="button"
             onClick={handlePrintSummary}

@@ -20,6 +20,8 @@ import {
   FileText,
   Globe,
   ExternalLink,
+  KeyRound,
+  Loader2,
   X,
 } from 'lucide-react';
 import {
@@ -35,12 +37,15 @@ import {
   TRANSPORT_OPTIONS,
   VISIT_FREQUENCY_OPTIONS,
   getLocalDateString,
+  normalizeSurveyCode,
   type BranchOption,
+  type SurveyCodeRecord,
   type SurveyDraft,
   type SurveyResponse,
   type VisitFrequencyOption,
 } from '../types/survey';
 import { submitSurveyResponse } from '../utils/surveyStorage';
+import { verifySurveyCode } from '../utils/surveyCodeStorage';
 import {
   AgeGroupIcon,
   CompanionIcon,
@@ -57,12 +62,14 @@ import {
 
 interface SurveyFlowProps {
   initialBranch?: BranchOption | '';
+  initialCode?: string;
   onSubmitted: (response: SurveyResponse) => void;
   onOpenDashboard?: () => void;
 }
 
 const INITIAL_DRAFT: SurveyDraft = {
   consent: '',
+  surveyCode: '',
   branch: '',
   name: '',
   gender: '',
@@ -97,9 +104,10 @@ const ALL_STEPS: StepMeta[] = [
   {
     id: 'consent',
     number: '01',
-    title: 'Consent',
+    title: 'Consent & Code',
     question: 'Do you consent to participate in this marketing research survey?',
-    subtitle: 'Your responses will be used strictly for marketing research purposes.',
+    subtitle:
+      'Confirm your consent and verify your single-use survey code to begin.',
   },
   {
     id: 'branch',
@@ -204,26 +212,79 @@ const ALL_STEPS: StepMeta[] = [
 
 export function SurveyFlow({
   initialBranch = '',
+  initialCode = '',
   onSubmitted,
   onOpenDashboard,
 }: SurveyFlowProps) {
   const [draft, setDraft] = useState<SurveyDraft>(() => ({
     ...INITIAL_DRAFT,
     branch: initialBranch || '',
+    surveyCode: normalizeSurveyCode(initialCode),
   }));
   const [branchSearch, setBranchSearch] = useState('');
   const [stepIndex, setStepIndex] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [needsFreshCode, setNeedsFreshCode] = useState(false);
   const [completedResponse, setCompletedResponse] = useState<SurveyResponse | null>(null);
   const [showPrivacyModal, setShowPrivacyModal] = useState(true);
   const [showSoloPromoModal, setShowSoloPromoModal] = useState(false);
+  const [verifiedCode, setVerifiedCode] = useState<SurveyCodeRecord | null>(null);
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
+  const [codeError, setCodeError] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialBranch) {
       setDraft((prev) => (prev.branch ? prev : { ...prev, branch: initialBranch }));
     }
   }, [initialBranch]);
+
+  const handleVerifySurveyCode = async (rawInput?: string) => {
+    const target = normalizeSurveyCode(rawInput ?? draft.surveyCode);
+    setDraft((prev) => ({ ...prev, surveyCode: target }));
+
+    if (!target) {
+      setVerifiedCode(null);
+      setCodeError('Please enter your survey code before verifying.');
+      return;
+    }
+
+    setIsVerifyingCode(true);
+    setCodeError(null);
+    setNeedsFreshCode(false);
+    try {
+      const result = await verifySurveyCode(target);
+      if (result.valid) {
+        setVerifiedCode(result.record);
+        setCodeError(null);
+        setDraft((prev) => ({
+          ...prev,
+          surveyCode: result.record.code,
+          branch: result.record.branch || prev.branch,
+        }));
+      } else {
+        setVerifiedCode(null);
+        setCodeError(result.message);
+      }
+    } catch (err) {
+      setVerifiedCode(null);
+      setCodeError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to verify survey code right now. Please try again.'
+      );
+    } finally {
+      setIsVerifyingCode(false);
+    }
+  };
+
+  useEffect(() => {
+    const normalized = normalizeSurveyCode(initialCode);
+    if (!normalized) return;
+    setDraft((prev) => ({ ...prev, surveyCode: normalized }));
+    void handleVerifySurveyCode(normalized);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialCode]);
 
   const filteredBranches = useMemo(() => {
     const q = branchSearch.trim().toUpperCase();
@@ -253,7 +314,7 @@ export function SurveyFlow({
   const canProceed = useMemo(() => {
     switch (currentStep.id) {
       case 'consent':
-        return draft.consent === 'Yes';
+        return draft.consent === 'Yes' && Boolean(verifiedCode);
       case 'branch':
         return Boolean(draft.branch);
       case 'name':
@@ -289,12 +350,14 @@ export function SurveyFlow({
       default:
         return false;
     }
-  }, [currentStep.id, draft]);
+  }, [currentStep.id, draft, verifiedCode]);
 
   const stepSummary = (stepId: string): string | null => {
     switch (stepId) {
       case 'consent':
-        return draft.consent === 'Yes' ? 'Consented' : null;
+        return draft.consent === 'Yes' && verifiedCode
+          ? `Consented · ${verifiedCode.code}`
+          : null;
       case 'branch':
         return draft.branch || null;
       case 'name':
@@ -366,8 +429,15 @@ export function SurveyFlow({
 
   const handleSubmit = async () => {
     if (!canProceed || isSubmitting) return;
+    if (!verifiedCode) {
+      setErrorMsg('Please verify an active single-use survey code in Step 01 before submitting.');
+      setNeedsFreshCode(true);
+      setStepIndex(0);
+      return;
+    }
     setIsSubmitting(true);
     setErrorMsg(null);
+    setNeedsFreshCode(false);
 
     const originFinal =
       draft.origin === 'Other' ? draft.originOther.trim() : draft.origin;
@@ -388,6 +458,7 @@ export function SurveyFlow({
     try {
       const created = await submitSurveyResponse({
         consent: draft.consent,
+        surveyCode: verifiedCode.code,
         branch: draft.branch,
         name: draft.name.trim(),
         gender: draft.gender as SurveyResponse['gender'],
@@ -413,9 +484,16 @@ export function SurveyFlow({
       setShowSoloPromoModal(true);
       onSubmitted(created);
     } catch (err) {
-      setErrorMsg(
-        err instanceof Error ? err.message : 'Network error while submitting survey.'
-      );
+      const msg =
+        err instanceof Error ? err.message : 'Network error while submitting survey.';
+      const isCodeFailure =
+        /survey code|already been used|no longer active|not found|single-use/i.test(msg);
+      if (isCodeFailure) {
+        setVerifiedCode(null);
+        setCodeError(msg);
+        setNeedsFreshCode(true);
+      }
+      setErrorMsg(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -425,10 +503,14 @@ export function SurveyFlow({
     setDraft({
       ...INITIAL_DRAFT,
       branch: initialBranch || '',
+      surveyCode: '',
     });
     setBranchSearch('');
     setStepIndex(0);
     setErrorMsg(null);
+    setNeedsFreshCode(false);
+    setVerifiedCode(null);
+    setCodeError(null);
     setCompletedResponse(null);
     setShowSoloPromoModal(false);
     setShowPrivacyModal(true);
@@ -561,6 +643,14 @@ export function SurveyFlow({
           </div>
 
           <div className="mt-8 pt-6 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+            {completedResponse.surveyCode && (
+              <div className="flex items-center justify-between py-2 border-b border-slate-100 sm:border-b-0 sm:col-span-2">
+                <span className="text-slate-500">Redeemed Survey Code</span>
+                <span className="font-mono font-semibold text-slate-900">
+                  {completedResponse.surveyCode}
+                </span>
+              </div>
+            )}
             {completedResponse.branch && (
               <div className="flex items-center justify-between py-2 border-b border-slate-100 sm:border-b-0 sm:col-span-2">
                 <span className="text-slate-500">Branch</span>
@@ -922,10 +1012,25 @@ export function SurveyFlow({
             {errorMsg && (
               <div
                 role="alert"
-                className="mt-4 p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm flex items-center gap-2.5"
+                className="mt-4 p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3"
               >
-                <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
-                <span>{errorMsg}</span>
+                <div className="flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
+                  <span>{errorMsg}</span>
+                </div>
+                {needsFreshCode && stepIndex > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStepIndex(0);
+                      setErrorMsg(null);
+                      setNeedsFreshCode(false);
+                    }}
+                    className="px-3.5 py-2 rounded-lg bg-amber-900 hover:bg-amber-950 text-white text-xs font-semibold whitespace-nowrap shrink-0 transition-colors"
+                  >
+                    Enter New Code
+                  </button>
+                )}
               </div>
             )}
 
@@ -1014,6 +1119,128 @@ export function SurveyFlow({
                       would like to proceed.
                     </div>
                   )}
+
+                  {/* Single-Use Survey Code Verification (Required in Consent Step) */}
+                  <div className="pt-2">
+                    <div className="p-4 sm:p-5 rounded-xl border border-slate-200 bg-slate-50/70 space-y-3">
+                      <div className="flex items-start gap-3">
+                        <div
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                            verifiedCode
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-red-50 text-red-600'
+                          }`}
+                        >
+                          <KeyRound className="w-5 h-5" aria-hidden="true" />
+                        </div>
+                        <div className="min-w-0">
+                          <label
+                            htmlFor="survey-code-input"
+                            className="block text-sm font-semibold text-slate-900"
+                          >
+                            Survey Code <span className="text-red-600">*</span>
+                          </label>
+                          <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                            Enter an active single-use survey code issued from the Head Office
+                            dashboard. Each code can only be used once.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-2.5">
+                        <input
+                          id="survey-code-input"
+                          type="text"
+                          value={draft.surveyCode}
+                          onChange={(e) => {
+                            const nextVal = normalizeSurveyCode(e.target.value);
+                            setDraft((prev) => ({ ...prev, surveyCode: nextVal }));
+                            if (verifiedCode && verifiedCode.code !== nextVal) {
+                              setVerifiedCode(null);
+                            }
+                            if (codeError) setCodeError(null);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              void handleVerifySurveyCode();
+                            }
+                          }}
+                          placeholder="Enter code (e.g. JN-4K7P-9M2X)"
+                          maxLength={32}
+                          autoComplete="off"
+                          spellCheck={false}
+                          className="flex-1 h-12 px-4 rounded-xl border border-slate-300 bg-white font-mono text-sm uppercase tracking-wider text-slate-900 placeholder:text-slate-400 placeholder:normal-case placeholder:tracking-normal focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void handleVerifySurveyCode()}
+                          disabled={isVerifyingCode || !draft.surveyCode.trim()}
+                          className={`min-h-[48px] px-5 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors whitespace-nowrap shrink-0 disabled:opacity-50 ${
+                            verifiedCode
+                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                              : 'bg-slate-900 hover:bg-slate-800 text-white'
+                          }`}
+                        >
+                          {isVerifyingCode ? (
+                            <>
+                              <Loader2
+                                className="w-4 h-4 animate-spin"
+                                aria-hidden="true"
+                              />
+                              <span>Verifying...</span>
+                            </>
+                          ) : verifiedCode ? (
+                            <>
+                              <Check className="w-4 h-4" aria-hidden="true" />
+                              <span>Verified</span>
+                            </>
+                          ) : (
+                            <span>Verify Code</span>
+                          )}
+                        </button>
+                      </div>
+
+                      {verifiedCode && (
+                        <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs sm:text-sm flex items-start gap-2.5">
+                          <CheckCircle2
+                            className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5"
+                            aria-hidden="true"
+                          />
+                          <div>
+                            <span className="font-semibold">
+                              Code{' '}
+                              <span className="font-mono">{verifiedCode.code}</span>{' '}
+                              verified.
+                            </span>{' '}
+                            {verifiedCode.branch
+                              ? `Assigned to ${verifiedCode.branch}. `
+                              : ''}
+                            This code will be locked permanently once your survey is submitted.
+                          </div>
+                        </div>
+                      )}
+
+                      {codeError && (
+                        <div
+                          role="alert"
+                          className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs sm:text-sm flex items-start gap-2.5"
+                        >
+                          <AlertCircle
+                            className="w-4 h-4 text-amber-700 shrink-0 mt-0.5"
+                            aria-hidden="true"
+                          />
+                          <span>{codeError}</span>
+                        </div>
+                      )}
+
+                      {draft.consent === 'Yes' && !verifiedCode && !codeError && (
+                        <p className="text-xs text-slate-500">
+                          Verify your single-use survey code above to unlock the Continue button.
+                        </p>
+                      )}
+                    </div>
+                  </div>
 
                   <div>
                     <button

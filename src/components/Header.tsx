@@ -1,12 +1,14 @@
 import React from 'react';
-import { Check, Copy, Download, Lock } from 'lucide-react';
+import { Check, Copy, Download, KeyRound, Lock } from 'lucide-react';
 import { BrandLogo } from './Icons';
 
-export type AppView = 'survey' | 'dashboard' | 'responses';
+export type AppView = 'survey' | 'dashboard' | 'responses' | 'codes';
 
 interface HeaderProps {
   activeView: AppView;
   isLocked: boolean;
+  isHeadOffice: boolean;
+  activeCodeCount: number;
   onSelectView: (view: AppView) => void;
   onDownloadCsv: () => void;
   onCopySurveyLink: () => void;
@@ -19,6 +21,8 @@ interface HeaderProps {
 export function Header({
   activeView,
   isLocked,
+  isHeadOffice,
+  activeCodeCount,
   onSelectView,
   onDownloadCsv,
   onCopySurveyLink,
@@ -90,6 +94,23 @@ export function Header({
               {responseCount}
             </span>
           </button>
+          {isHeadOffice && (
+            <button
+              type="button"
+              onClick={() => onSelectView('codes')}
+              className={`py-1.5 border-b-2 transition-colors whitespace-nowrap shrink-0 min-h-[40px] flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${
+                activeView === 'codes'
+                  ? 'border-red-500 text-slate-900 font-semibold'
+                  : 'border-transparent text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <KeyRound className="w-3.5 h-3.5 text-red-500" aria-hidden="true" />
+              <span>Survey Codes</span>
+              <span className="font-mono text-xs text-slate-500 tabular-nums">
+                {activeCodeCount}
+              </span>
+            </button>
+          )}
           <button
             type="button"
             onClick={onCopySurveyLink}
