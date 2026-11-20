@@ -12,6 +12,7 @@ import {
   CreditCard,
   Crown,
   Flame,
+  Footprints,
   GraduationCap,
   Heart,
   HeartHandshake,
@@ -41,6 +42,7 @@ import type {
   OccupationOption,
   RelationshipStatusOption,
   TransportModeOption,
+  VisitFrequencyOption,
 } from '../types/survey';
 
 export function TricycleIcon({ className = 'w-5 h-5' }: { className?: string }) {
@@ -188,6 +190,23 @@ export function CompanionIcon({
   }
 }
 
+export function VisitFrequencyIcon({
+  frequency,
+  className = 'w-5 h-5',
+}: {
+  frequency: VisitFrequencyOption;
+  className?: string;
+}) {
+  switch (frequency) {
+    case 'First Time':
+      return <Sparkles className={className} aria-hidden="true" />;
+    case '2nd Time':
+      return <Flame className={className} aria-hidden="true" />;
+    case '3 or More Times':
+      return <Crown className={className} aria-hidden="true" />;
+  }
+}
+
 export function TransportIcon({
   mode,
   className = 'w-5 h-5',
@@ -208,6 +227,8 @@ export function TransportIcon({
       return <TricycleIcon className={className} />;
     case 'Ride-Hailing App (Grab)':
       return <CarFront className={className} aria-hidden="true" />;
+    case 'Walked Only':
+      return <Footprints className={className} aria-hidden="true" />;
   }
 }
 

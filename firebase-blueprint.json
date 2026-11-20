@@ -94,14 +94,20 @@
           "enum": ["Solo", "Friends", "Family"],
           "maxLength": 16
         },
+        "visitFrequency": {
+          "type": "string",
+          "description": "Whether this is the respondent's first time, 2nd time, or 3 or more times dining with Jiang Nan.",
+          "enum": ["First Time", "2nd Time", "3 or More Times"],
+          "maxLength": 24
+        },
         "partySize": {
           "type": "number",
           "description": "Total number of guests in the dining party (1 to 50)."
         },
         "transportCategory": {
           "type": "string",
-          "description": "Private or Public transport classification.",
-          "enum": ["Private", "Public"],
+          "description": "Private, Public, or On Foot transport classification.",
+          "enum": ["Private", "Public", "On Foot"],
           "maxLength": 16
         },
         "transportMode": {
@@ -113,7 +119,8 @@
             "Private Tricycle",
             "Public Mototaxi",
             "Public Tricycle",
-            "Ride-Hailing App (Grab)"
+            "Ride-Hailing App (Grab)",
+            "Walked Only"
           ],
           "maxLength": 40
         },
@@ -154,6 +161,12 @@
           "description": "Preferred mode of payment.",
           "minLength": 1,
           "maxLength": 60
+        },
+        "awareOnlineSoloMeal": {
+          "type": "string",
+          "description": "Whether the respondent is aware they can order a Hot Pot Solo meal online thru the website.",
+          "enum": ["Yes", "No"],
+          "maxLength": 3
         }
       },
       "required": [

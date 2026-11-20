@@ -18,6 +18,8 @@ import {
   ShieldCheck,
   ShieldOff,
   FileText,
+  Globe,
+  HelpCircle,
   X,
 } from 'lucide-react';
 import {
@@ -27,14 +29,18 @@ import {
   GENDER_OPTIONS,
   LOCATION_OPTIONS,
   OCCUPATION_OPTIONS,
+  ONLINE_SOLO_AWARENESS_OPTIONS,
   PAYMENT_METHOD_OPTIONS,
   RELATIONSHIP_STATUS_OPTIONS,
   SPEND_BRACKETS,
   TRANSPORT_OPTIONS,
+  VISIT_FREQUENCY_OPTIONS,
   getLocalDateString,
   type BranchOption,
+  type OnlineSoloAwarenessOption,
   type SurveyDraft,
   type SurveyResponse,
+  type VisitFrequencyOption,
 } from '../types/survey';
 import { submitSurveyResponse } from '../utils/surveyStorage';
 import {
@@ -47,6 +53,7 @@ import {
   RelationshipIcon,
   SpendTierIcon,
   TransportIcon,
+  VisitFrequencyIcon,
   BrandLogo,
 } from './Icons';
 
@@ -65,6 +72,7 @@ const INITIAL_DRAFT: SurveyDraft = {
   occupation: '',
   relationshipStatus: '',
   diningWith: '',
+  visitFrequency: '',
   partySize: 2,
   transportMode: '',
   origin: '',
@@ -77,6 +85,7 @@ const INITIAL_DRAFT: SurveyDraft = {
   orderedTakeout: false,
   paymentMethod: '',
   paymentOther: '',
+  awareOnlineSoloMeal: '',
 };
 
 interface StepMeta {
@@ -145,36 +154,43 @@ const ALL_STEPS: StepMeta[] = [
     subtitle: 'Tell us who is joining your table today.',
   },
   {
-    id: 'partySize',
+    id: 'visitFrequency',
     number: '09',
+    title: 'Visit History',
+    question: 'Is this your first time dining with us?',
+    subtitle: 'Let us know how many times you have dined at Jiang Nan.',
+  },
+  {
+    id: 'partySize',
+    number: '10',
     title: 'Group Count',
     question: 'How many people are in your group?',
     subtitle: 'Include yourself in the total headcount (pax).',
   },
   {
     id: 'transport',
-    number: '10',
+    number: '11',
     title: 'Arrival Mode',
     question: 'How did you get here today?',
-    subtitle: 'Choose whether you arrived by private vehicle or public transport.',
+    subtitle: 'Choose whether you arrived by private vehicle, public transport, or on foot.',
   },
   {
     id: 'origin',
-    number: '11',
+    number: '12',
     title: 'Before Dining',
     question: 'Where were you before you decided to dine with us?',
     subtitle: 'Select the place you were at before deciding to dine with us.',
   },
   {
     id: 'destination',
-    number: '12',
+    number: '13',
     title: 'After Dining',
     question: 'Where are you heading after dining with us?',
     subtitle: 'Select the place you plan to go after dining with us.',
   },
   {
     id: 'spend',
-    number: '13',
+    number: '14',
     title: 'Willingness to Spend',
     question: 'How much are you willing to spend per person?',
     subtitle:
@@ -182,10 +198,19 @@ const ALL_STEPS: StepMeta[] = [
   },
   {
     id: 'payment',
-    number: '14',
+    number: '15',
     title: 'Payment Mode',
     question: 'What is your preferred mode of payment?',
     subtitle: 'Select the payment option you prefer to use when dining.',
+  },
+  {
+    id: 'onlineSoloAwareness',
+    number: '16',
+    title: 'Online Solo Meal',
+    question:
+      'Are you aware that you can order a Hot Pot Solo meal online thru our website?',
+    subtitle:
+      'Let us know if you already knew you can order a Hot Pot Solo meal directly on our website.',
   },
 ];
 
@@ -254,6 +279,8 @@ export function SurveyFlow({
         return Boolean(draft.relationshipStatus);
       case 'companion':
         return Boolean(draft.diningWith);
+      case 'visitFrequency':
+        return Boolean(draft.visitFrequency);
       case 'partySize':
         return draft.partySize >= 2;
       case 'transport':
@@ -270,6 +297,8 @@ export function SurveyFlow({
         return draft.paymentMethod === 'Other'
           ? draft.paymentOther.trim().length > 0
           : Boolean(draft.paymentMethod);
+      case 'onlineSoloAwareness':
+        return Boolean(draft.awareOnlineSoloMeal);
       default:
         return false;
     }
@@ -297,6 +326,8 @@ export function SurveyFlow({
             ? 'Solo (1 pax)'
             : draft.diningWith
           : null;
+      case 'visitFrequency':
+        return draft.visitFrequency || null;
       case 'partySize':
         return draft.diningWith && draft.diningWith !== 'Solo'
           ? `${draft.partySize} pax`
@@ -324,6 +355,8 @@ export function SurveyFlow({
         return draft.paymentMethod === 'Other'
           ? draft.paymentOther.trim() || 'Other'
           : draft.paymentMethod;
+      case 'onlineSoloAwareness':
+        return draft.awareOnlineSoloMeal || null;
       default:
         return null;
     }
@@ -378,6 +411,7 @@ export function SurveyFlow({
         relationshipStatus:
           draft.relationshipStatus as SurveyResponse['relationshipStatus'],
         diningWith: draft.diningWith as SurveyResponse['diningWith'],
+        visitFrequency: draft.visitFrequency as VisitFrequencyOption,
         partySize: draft.diningWith === 'Solo' ? 1 : draft.partySize,
         transportMode: draft.transportMode as SurveyResponse['transportMode'],
         origin: originFinal,
@@ -387,6 +421,8 @@ export function SurveyFlow({
         spendEstimate,
         orderedTakeout: draft.orderedTakeout,
         paymentMethod: paymentFinal,
+        awareOnlineSoloMeal:
+          draft.awareOnlineSoloMeal as OnlineSoloAwarenessOption,
         clientDate: getLocalDateString(new Date()),
       });
 
@@ -471,6 +507,14 @@ export function SurveyFlow({
                 {completedResponse.diningWith} ({completedResponse.partySize} pax)
               </span>
             </div>
+            {completedResponse.visitFrequency && (
+              <div className="flex items-center justify-between py-2 border-b border-slate-100 sm:border-b-0">
+                <span className="text-slate-500">Visit History</span>
+                <span className="font-medium text-slate-900">
+                  {completedResponse.visitFrequency}
+                </span>
+              </div>
+            )}
             <div className="flex items-center justify-between py-2 border-b border-slate-100 sm:border-b-0">
               <span className="text-slate-500">Arrival</span>
               <span className="font-medium text-slate-900">
@@ -490,6 +534,16 @@ export function SurveyFlow({
                 {completedResponse.paymentMethod}
               </span>
             </div>
+            {completedResponse.awareOnlineSoloMeal && (
+              <div className="flex items-center justify-between py-2 border-b border-slate-100 sm:border-b-0 sm:col-span-2">
+                <span className="text-slate-500">Online Hot Pot Solo Awareness</span>
+                <span className="font-medium text-slate-900">
+                  {completedResponse.awareOnlineSoloMeal === 'Yes'
+                    ? 'Yes, aware'
+                    : 'No, not yet aware'}
+                </span>
+              </div>
+            )}
             <div className="flex items-center justify-between py-2 sm:col-span-2">
               <span className="text-slate-500">Journey</span>
               <span className="font-medium text-slate-900 inline-flex items-center gap-1.5">
@@ -527,6 +581,7 @@ export function SurveyFlow({
 
   const privateModes = TRANSPORT_OPTIONS.filter((t) => t.category === 'Private');
   const publicModes = TRANSPORT_OPTIONS.filter((t) => t.category === 'Public');
+  const walkingModes = TRANSPORT_OPTIONS.filter((t) => t.category === 'On Foot');
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8 pb-24 lg:pb-12">
@@ -1235,6 +1290,64 @@ export function SurveyFlow({
                 </div>
               )}
 
+              {currentStep.id === 'visitFrequency' && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {VISIT_FREQUENCY_OPTIONS.map((option) => {
+                    const selected = draft.visitFrequency === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() =>
+                          setDraft((prev) => ({
+                            ...prev,
+                            visitFrequency: option.value,
+                          }))
+                        }
+                        className={`min-h-[84px] p-4 rounded-xl border text-left flex sm:flex-col sm:items-start items-center gap-3 transition-all active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${
+                          selected
+                            ? 'border-red-500 bg-red-50/70 text-slate-900'
+                            : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-900'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between sm:w-full">
+                          <div
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                              selected
+                                ? 'bg-red-500 text-white'
+                                : 'bg-slate-100 text-slate-600'
+                            }`}
+                          >
+                            <VisitFrequencyIcon
+                              frequency={option.value}
+                              className="w-5 h-5"
+                            />
+                          </div>
+                          {selected && (
+                            <Check
+                              className="w-5 h-5 text-red-600 hidden sm:block"
+                              aria-hidden="true"
+                            />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-semibold">{option.label}</div>
+                          <div className="text-xs text-slate-500 mt-0.5">
+                            {option.hint}
+                          </div>
+                        </div>
+                        {selected && (
+                          <Check
+                            className="w-5 h-5 text-red-600 sm:hidden shrink-0"
+                            aria-hidden="true"
+                          />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
               {currentStep.id === 'partySize' && (
                 <div className="space-y-6">
                   {/* Quick Select Chips */}
@@ -1371,6 +1484,58 @@ export function SurveyFlow({
                     </h2>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       {publicModes.map((option) => {
+                        const selected = draft.transportMode === option.value;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() =>
+                              setDraft((prev) => ({
+                                ...prev,
+                                transportMode: option.value,
+                              }))
+                            }
+                            className={`min-h-[68px] p-3.5 rounded-xl border text-left flex items-center gap-3 transition-all active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${
+                              selected
+                                ? 'border-red-500 bg-red-50/70 text-slate-900'
+                                : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-900'
+                            }`}
+                          >
+                            <div
+                              className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                                selected
+                                  ? 'bg-red-500 text-white'
+                                  : 'bg-slate-100 text-slate-600'
+                              }`}
+                            >
+                              <TransportIcon mode={option.value} className="w-5 h-5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-sm font-semibold leading-tight">
+                                {option.label}
+                              </div>
+                              <div className="text-xs text-slate-500 mt-0.5 truncate">
+                                {option.hint}
+                              </div>
+                            </div>
+                            {selected && (
+                              <Check
+                                className="w-4 h-4 text-red-600 shrink-0"
+                                aria-hidden="true"
+                              />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100">
+                    <h2 className="text-xs font-semibold text-slate-500 mb-3">
+                      On Foot
+                    </h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {walkingModes.map((option) => {
                         const selected = draft.transportMode === option.value;
                         return (
                           <button
@@ -1670,6 +1835,61 @@ export function SurveyFlow({
                       />
                     </div>
                   )}
+                </div>
+              )}
+
+              {currentStep.id === 'onlineSoloAwareness' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {ONLINE_SOLO_AWARENESS_OPTIONS.map((option) => {
+                    const selected = draft.awareOnlineSoloMeal === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() =>
+                          setDraft((prev) => ({
+                            ...prev,
+                            awareOnlineSoloMeal: option.value,
+                          }))
+                        }
+                        className={`min-h-[84px] p-4 sm:p-5 rounded-xl border text-left flex items-center justify-between gap-3 transition-all active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${
+                          selected
+                            ? 'border-red-500 bg-red-50/70 text-slate-900'
+                            : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-900'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div
+                            className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                              selected
+                                ? 'bg-red-500 text-white'
+                                : 'bg-slate-100 text-slate-600'
+                            }`}
+                          >
+                            {option.value === 'Yes' ? (
+                              <Globe className="w-5 h-5" aria-hidden="true" />
+                            ) : (
+                              <HelpCircle className="w-5 h-5" aria-hidden="true" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-sm sm:text-base font-semibold leading-tight">
+                              {option.label}
+                            </div>
+                            <div className="text-xs text-slate-500 mt-1">
+                              {option.hint}
+                            </div>
+                          </div>
+                        </div>
+                        {selected && (
+                          <Check
+                            className="w-5 h-5 text-red-600 shrink-0"
+                            aria-hidden="true"
+                          />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>

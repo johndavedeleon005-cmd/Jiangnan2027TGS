@@ -19,9 +19,11 @@ import {
   type DiningCompanionOption,
   type GenderOption,
   type OccupationOption,
+  type OnlineSoloAwarenessOption,
   type RelationshipStatusOption,
   type SurveyResponse,
   type TransportModeOption,
+  type VisitFrequencyOption,
 } from '../types/survey';
 
 const LOCAL_STORAGE_KEY = 'jiangnan_survey_responses_v1';
@@ -69,6 +71,13 @@ const VALID_TRANSPORTS: TransportModeOption[] = [
   'Public Mototaxi',
   'Public Tricycle',
   'Ride-Hailing App (Grab)',
+  'Walked Only',
+];
+
+const VALID_VISIT_FREQUENCIES: VisitFrequencyOption[] = [
+  'First Time',
+  '2nd Time',
+  '3 or More Times',
 ];
 
 export function getBaseAppUrl(): string {
@@ -207,6 +216,16 @@ function sanitizeSurveyResponse(raw: Partial<SurveyResponse>): SurveyResponse {
     base.branch = normalizedBranch;
   }
 
+  if (raw.awareOnlineSoloMeal === 'Yes' || raw.awareOnlineSoloMeal === 'No') {
+    base.awareOnlineSoloMeal = raw.awareOnlineSoloMeal;
+  }
+
+  if (
+    VALID_VISIT_FREQUENCIES.includes(raw.visitFrequency as VisitFrequencyOption)
+  ) {
+    base.visitFrequency = raw.visitFrequency as VisitFrequencyOption;
+  }
+
   return base;
 }
 
@@ -302,6 +321,7 @@ export interface SubmitSurveyPayload {
   occupation: SurveyResponse['occupation'];
   relationshipStatus: SurveyResponse['relationshipStatus'];
   diningWith: DiningCompanionOption;
+  visitFrequency?: VisitFrequencyOption;
   partySize: number;
   transportMode: TransportModeOption;
   origin: string;
@@ -311,6 +331,7 @@ export interface SubmitSurveyPayload {
   spendEstimate: number;
   orderedTakeout?: boolean;
   paymentMethod: string;
+  awareOnlineSoloMeal?: OnlineSoloAwarenessOption;
   clientDate: string;
 }
 
@@ -341,6 +362,7 @@ export async function submitSurveyResponse(
     occupation: payload.occupation,
     relationshipStatus: payload.relationshipStatus,
     diningWith: payload.diningWith,
+    visitFrequency: payload.visitFrequency,
     partySize: payload.diningWith === 'Solo' ? 1 : payload.partySize,
     transportCategory: getTransportCategory(payload.transportMode),
     transportMode: payload.transportMode,
@@ -351,6 +373,7 @@ export async function submitSurveyResponse(
     spendEstimate: payload.spendEstimate,
     orderedTakeout: Boolean(payload.orderedTakeout),
     paymentMethod: payload.paymentMethod,
+    awareOnlineSoloMeal: payload.awareOnlineSoloMeal,
   });
 
   const docPath = `${COLLECTION_PATH}/${entry.id}`;

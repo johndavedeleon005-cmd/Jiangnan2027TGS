@@ -58,7 +58,7 @@ export type RelationshipStatusOption =
 
 export type DiningCompanionOption = 'Solo' | 'Friends' | 'Family';
 
-export type TransportCategory = 'Private' | 'Public';
+export type TransportCategory = 'Private' | 'Public' | 'On Foot';
 
 export type TransportModeOption =
   | 'Private Car'
@@ -66,7 +66,8 @@ export type TransportModeOption =
   | 'Private Tricycle'
   | 'Public Mototaxi'
   | 'Public Tricycle'
-  | 'Ride-Hailing App (Grab)';
+  | 'Ride-Hailing App (Grab)'
+  | 'Walked Only';
 
 export type LocationOption =
   | 'Home'
@@ -88,6 +89,10 @@ export type PaymentMethodOption =
 
 export type ConsentOption = 'Yes' | 'No';
 
+export type VisitFrequencyOption = 'First Time' | '2nd Time' | '3 or More Times';
+
+export type OnlineSoloAwarenessOption = 'Yes' | 'No';
+
 export interface SurveyDraft {
   consent: ConsentOption | '';
   branch: BranchOption | '';
@@ -97,6 +102,7 @@ export interface SurveyDraft {
   occupation: OccupationOption | '';
   relationshipStatus: RelationshipStatusOption | '';
   diningWith: DiningCompanionOption | '';
+  visitFrequency: VisitFrequencyOption | '';
   partySize: number;
   transportMode: TransportModeOption | '';
   origin: string;
@@ -109,6 +115,7 @@ export interface SurveyDraft {
   orderedTakeout: boolean;
   paymentMethod: PaymentMethodOption | '';
   paymentOther: string;
+  awareOnlineSoloMeal: OnlineSoloAwarenessOption | '';
 }
 
 export interface SurveyResponse {
@@ -123,6 +130,7 @@ export interface SurveyResponse {
   occupation?: OccupationOption;
   relationshipStatus?: RelationshipStatusOption;
   diningWith: DiningCompanionOption;
+  visitFrequency?: VisitFrequencyOption;
   partySize: number;
   transportCategory: TransportCategory;
   transportMode: TransportModeOption;
@@ -133,6 +141,7 @@ export interface SurveyResponse {
   spendEstimate: number;
   orderedTakeout?: boolean;
   paymentMethod?: string;
+  awareOnlineSoloMeal?: OnlineSoloAwarenessOption;
 }
 
 export const GENDER_OPTIONS: { value: GenderOption; label: string; hint: string }[] = [
@@ -182,6 +191,28 @@ export const COMPANION_OPTIONS: {
   { value: 'Family', label: 'With Family', hint: 'Parents, kids, or relatives' },
 ];
 
+export const VISIT_FREQUENCY_OPTIONS: {
+  value: VisitFrequencyOption;
+  label: string;
+  hint: string;
+}[] = [
+  {
+    value: 'First Time',
+    label: 'First Time',
+    hint: 'My first time dining at Jiang Nan',
+  },
+  {
+    value: '2nd Time',
+    label: '2nd Time',
+    hint: 'My second visit dining with us',
+  },
+  {
+    value: '3 or More Times',
+    label: '3 or More Times',
+    hint: 'Returning / regular diner',
+  },
+];
+
 export const TRANSPORT_OPTIONS: {
   value: TransportModeOption;
   category: TransportCategory;
@@ -223,6 +254,12 @@ export const TRANSPORT_OPTIONS: {
     category: 'Public',
     label: 'Car Ride-Hailing (Grab)',
     hint: 'GrabCar / TNVS booking',
+  },
+  {
+    value: 'Walked Only',
+    category: 'On Foot',
+    label: 'Walked Only',
+    hint: 'Arrived on foot / walked from nearby',
   },
 ];
 
@@ -304,6 +341,23 @@ export const PAYMENT_METHOD_OPTIONS: {
   { value: 'Other', label: 'Other Method', hint: 'Voucher, gift card, or other' },
 ];
 
+export const ONLINE_SOLO_AWARENESS_OPTIONS: {
+  value: OnlineSoloAwarenessOption;
+  label: string;
+  hint: string;
+}[] = [
+  {
+    value: 'Yes',
+    label: "Yes, I'm aware",
+    hint: 'I already knew I can order a Hot Pot Solo meal online thru your website',
+  },
+  {
+    value: 'No',
+    label: 'No, this is new to me',
+    hint: "I wasn't aware it can be ordered online thru the website",
+  },
+];
+
 export function getTransportCategory(mode: TransportModeOption): TransportCategory {
   const found = TRANSPORT_OPTIONS.find((item) => item.value === mode);
   return found ? found.category : 'Public';
@@ -338,6 +392,7 @@ export function buildSurveyCsv(responses: SurveyResponse[]): string {
     'Occupation',
     'Relationship Status',
     'Dining Companion',
+    'Visit Frequency',
     'Party Size (Pax)',
     'Transport Category',
     'Transport Mode',
@@ -348,6 +403,7 @@ export function buildSurveyCsv(responses: SurveyResponse[]): string {
     'Estimated Spend Per Pax',
     'Ordered for Takeout',
     'Preferred Mode of Payment',
+    'Aware of Online Hot Pot Solo Meal',
   ];
 
   const rows = responses.map((r) => {
@@ -374,6 +430,7 @@ export function buildSurveyCsv(responses: SurveyResponse[]): string {
       r.occupation || 'Unspecified',
       r.relationshipStatus || 'Unspecified',
       r.diningWith,
+      r.visitFrequency || 'Unspecified',
       r.partySize,
       r.transportCategory,
       r.transportMode,
@@ -384,6 +441,7 @@ export function buildSurveyCsv(responses: SurveyResponse[]): string {
       r.spendEstimate,
       r.orderedTakeout ? 'Yes' : 'No',
       r.paymentMethod || 'Unspecified',
+      r.awareOnlineSoloMeal || 'Unspecified',
     ]
       .map(escapeCsvCell)
       .join(',');

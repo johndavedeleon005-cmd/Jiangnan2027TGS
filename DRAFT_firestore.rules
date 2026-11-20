@@ -78,6 +78,7 @@ service cloud.firestore {
         'occupation',
         'relationshipStatus',
         'diningWith',
+        'visitFrequency',
         'partySize',
         'transportCategory',
         'transportMode',
@@ -87,7 +88,8 @@ service cloud.firestore {
         'spendPerPax',
         'spendEstimate',
         'orderedTakeout',
-        'paymentMethod'
+        'paymentMethod',
+        'awareOnlineSoloMeal'
       ]) &&
       data.id is string && data.id.size() >= 4 && data.id.size() <= 64 && data.id == surveyId &&
       data.submittedAt is string && data.submittedAt.size() >= 10 && data.submittedAt.size() <= 40 &&
@@ -100,15 +102,17 @@ service cloud.firestore {
       data.occupation is string && data.occupation.size() <= 24 && data.occupation in ['Student', 'Employed', 'Unemployed'] &&
       data.relationshipStatus is string && data.relationshipStatus.size() <= 32 && data.relationshipStatus in ['Single', 'In a Relationship', 'Married', 'Prefer not to say'] &&
       data.diningWith is string && data.diningWith.size() <= 16 && data.diningWith in ['Solo', 'Friends', 'Family'] &&
+      (!('visitFrequency' in data) || (data.visitFrequency is string && data.visitFrequency.size() >= 1 && data.visitFrequency.size() <= 24 && data.visitFrequency in ['First Time', '2nd Time', '3 or More Times'])) &&
       data.partySize is number && data.partySize >= 1 && data.partySize <= 50 &&
-      data.transportCategory is string && data.transportCategory.size() <= 16 && data.transportCategory in ['Private', 'Public'] &&
+      data.transportCategory is string && data.transportCategory.size() <= 16 && data.transportCategory in ['Private', 'Public', 'On Foot'] &&
       data.transportMode is string && data.transportMode.size() <= 40 && data.transportMode in [
         'Private Car',
         'Private Motorcycle',
         'Private Tricycle',
         'Public Mototaxi',
         'Public Tricycle',
-        'Ride-Hailing App (Grab)'
+        'Ride-Hailing App (Grab)',
+        'Walked Only'
       ] &&
       data.origin is string && data.origin.size() >= 1 && data.origin.size() <= 80 &&
       data.destination is string && data.destination.size() >= 1 && data.destination.size() <= 80 &&
@@ -116,7 +120,8 @@ service cloud.firestore {
       data.spendPerPax is string && data.spendPerPax.size() >= 1 && data.spendPerPax.size() <= 80 &&
       data.spendEstimate is number && data.spendEstimate >= 0 && data.spendEstimate <= 1000000 &&
       (!('orderedTakeout' in data) || data.orderedTakeout is bool) &&
-      data.paymentMethod is string && data.paymentMethod.size() >= 1 && data.paymentMethod.size() <= 60;
+      data.paymentMethod is string && data.paymentMethod.size() >= 1 && data.paymentMethod.size() <= 60 &&
+      (!('awareOnlineSoloMeal' in data) || (data.awareOnlineSoloMeal is string && data.awareOnlineSoloMeal.size() >= 2 && data.awareOnlineSoloMeal.size() <= 3 && data.awareOnlineSoloMeal in ['Yes', 'No']));
     }
 
     match /surveys/{surveyId} {

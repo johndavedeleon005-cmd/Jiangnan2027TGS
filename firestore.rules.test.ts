@@ -22,6 +22,7 @@ const VALID_PAYLOAD = {
   occupation: 'Employed',
   relationshipStatus: 'Single',
   diningWith: 'Friends',
+  visitFrequency: 'First Time',
   partySize: 3,
   transportCategory: 'Private',
   transportMode: 'Private Car',
@@ -32,10 +33,22 @@ const VALID_PAYLOAD = {
   spendEstimate: 749,
   orderedTakeout: true,
   paymentMethod: 'E-Wallet (GCash / Maya)',
+  awareOnlineSoloMeal: 'Yes',
 };
 
 export const DIRTY_DOZEN_CASES: DirtyDozenCase[] = [
   { name: 'Valid survey submission', docId: 'SRV-TEST-0001', payload: VALID_PAYLOAD, expectAllowed: true },
+  {
+    name: 'Valid Walked Only submission',
+    docId: 'SRV-TEST-0002',
+    payload: {
+      ...VALID_PAYLOAD,
+      id: 'SRV-TEST-0002',
+      transportCategory: 'On Foot',
+      transportMode: 'Walked Only',
+    },
+    expectAllowed: true,
+  },
   { name: '1. Declined consent', docId: 'SRV-TEST-0001', payload: { ...VALID_PAYLOAD, consent: 'No' }, expectAllowed: false },
   { name: '2. Ghost field injection', docId: 'SRV-TEST-0001', payload: { ...VALID_PAYLOAD, isAdmin: true }, expectAllowed: false },
   { name: '3. Oversized name', docId: 'SRV-TEST-0001', payload: { ...VALID_PAYLOAD, name: 'A'.repeat(81) }, expectAllowed: false },
@@ -48,4 +61,6 @@ export const DIRTY_DOZEN_CASES: DirtyDozenCase[] = [
   { name: '10. Negative spendEstimate', docId: 'SRV-TEST-0001', payload: { ...VALID_PAYLOAD, spendEstimate: -5 }, expectAllowed: false },
   { name: '11. Invalid branch name', docId: 'SRV-TEST-0001', payload: { ...VALID_PAYLOAD, branch: 'INVALID BRANCH' }, expectAllowed: false },
   { name: '12. Empty paymentMethod string', docId: 'SRV-TEST-0001', payload: { ...VALID_PAYLOAD, paymentMethod: '' }, expectAllowed: false },
+  { name: '13. Invalid awareOnlineSoloMeal enum', docId: 'SRV-TEST-0001', payload: { ...VALID_PAYLOAD, awareOnlineSoloMeal: 'Maybe' }, expectAllowed: false },
+  { name: '14. Invalid visitFrequency enum', docId: 'SRV-TEST-0001', payload: { ...VALID_PAYLOAD, visitFrequency: '10th Time' }, expectAllowed: false },
 ];
