@@ -16,7 +16,6 @@ import {
   Download,
   ExternalLink,
   FileSpreadsheet,
-  Globe,
   Heart,
   Layers,
   Link2,
@@ -568,17 +567,6 @@ export function DashboardView({
   );
   const paymentStats = useMemo(
     () => countBy(filteredResponses, (r) => r.paymentMethod || 'Unspecified'),
-    [filteredResponses]
-  );
-  const onlineSoloAwarenessStats = useMemo(
-    () =>
-      countBy(filteredResponses, (r) =>
-        r.awareOnlineSoloMeal === 'Yes'
-          ? 'Aware (Yes)'
-          : r.awareOnlineSoloMeal === 'No'
-          ? 'Not Aware (No)'
-          : 'Unspecified'
-      ),
     [filteredResponses]
   );
   const visitFrequencyStats = useMemo(
@@ -1852,22 +1840,6 @@ export function DashboardView({
                 />
 
                 <BreakdownBarList
-                  title="Online Hot Pot Solo Awareness"
-                  headerIcon={<Globe className="w-4 h-4" aria-hidden="true" />}
-                  items={onlineSoloAwarenessStats}
-                  total={filteredResponses.length}
-                  renderIcon={(label) =>
-                    label === 'Aware (Yes)' ? (
-                      <Check className="w-4 h-4" aria-hidden="true" />
-                    ) : label === 'Not Aware (No)' ? (
-                      <X className="w-4 h-4" aria-hidden="true" />
-                    ) : (
-                      <Globe className="w-4 h-4" aria-hidden="true" />
-                    )
-                  }
-                />
-
-                <BreakdownBarList
                   title="Visit Frequency"
                   headerIcon={<Sparkles className="w-4 h-4" aria-hidden="true" />}
                   items={visitFrequencyStats}
@@ -1972,7 +1944,6 @@ export function DashboardView({
                         <th className="py-3 px-4 whitespace-nowrap">Arrival Mode</th>
                         <th className="py-3 px-4 whitespace-nowrap">Journey</th>
                         <th className="py-3 px-4 whitespace-nowrap">Payment</th>
-                        <th className="py-3 px-4 whitespace-nowrap">Online Solo</th>
                         <th className="py-3 px-4 text-right whitespace-nowrap">
                           Budget / Pax
                         </th>
@@ -2075,21 +2046,6 @@ export function DashboardView({
                               />
                               <span>{r.paymentMethod || 'Unspecified'}</span>
                             </div>
-                          </td>
-                          <td className="py-3 px-4 whitespace-nowrap text-slate-700">
-                            {r.awareOnlineSoloMeal ? (
-                              <span
-                                className={
-                                  r.awareOnlineSoloMeal === 'Yes'
-                                    ? 'font-medium text-emerald-700'
-                                    : 'font-medium text-slate-600'
-                                }
-                              >
-                                {r.awareOnlineSoloMeal === 'Yes' ? 'Aware (Yes)' : 'Not Aware (No)'}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400">—</span>
-                            )}
                           </td>
                           <td className="py-3 px-4 text-right whitespace-nowrap font-mono font-semibold text-red-600 tabular-nums">
                             <div>{r.spendPerPax}</div>
@@ -2204,22 +2160,6 @@ export function DashboardView({
                           />
                           <span>{r.paymentMethod || 'Unspecified'}</span>
                         </div>
-                        {r.awareOnlineSoloMeal && (
-                          <div className="col-span-2 flex items-center gap-1.5 text-slate-700">
-                            <Globe
-                              className="w-3.5 h-3.5 text-slate-500 shrink-0"
-                              aria-hidden="true"
-                            />
-                            <span>
-                              Online Hot Pot Solo:{' '}
-                              <span className="font-medium">
-                                {r.awareOnlineSoloMeal === 'Yes'
-                                  ? 'Aware (Yes)'
-                                  : 'Not Aware (No)'}
-                              </span>
-                            </span>
-                          </div>
-                        )}
                       </div>
                     </div>
                   ))}

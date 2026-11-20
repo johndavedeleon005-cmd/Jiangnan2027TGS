@@ -115,7 +115,6 @@ export interface SurveyDraft {
   orderedTakeout: boolean;
   paymentMethod: PaymentMethodOption | '';
   paymentOther: string;
-  awareOnlineSoloMeal: OnlineSoloAwarenessOption | '';
 }
 
 export interface SurveyResponse {
@@ -341,23 +340,6 @@ export const PAYMENT_METHOD_OPTIONS: {
   { value: 'Other', label: 'Other Method', hint: 'Voucher, gift card, or other' },
 ];
 
-export const ONLINE_SOLO_AWARENESS_OPTIONS: {
-  value: OnlineSoloAwarenessOption;
-  label: string;
-  hint: string;
-}[] = [
-  {
-    value: 'Yes',
-    label: "Yes, I'm aware",
-    hint: 'I already knew I can order a Hot Pot Solo meal online thru your website',
-  },
-  {
-    value: 'No',
-    label: 'No, this is new to me',
-    hint: "I wasn't aware it can be ordered online thru the website",
-  },
-];
-
 export function getTransportCategory(mode: TransportModeOption): TransportCategory {
   const found = TRANSPORT_OPTIONS.find((item) => item.value === mode);
   return found ? found.category : 'Public';
@@ -403,7 +385,6 @@ export function buildSurveyCsv(responses: SurveyResponse[]): string {
     'Estimated Spend Per Pax',
     'Ordered for Takeout',
     'Preferred Mode of Payment',
-    'Aware of Online Hot Pot Solo Meal',
   ];
 
   const rows = responses.map((r) => {
@@ -441,7 +422,6 @@ export function buildSurveyCsv(responses: SurveyResponse[]): string {
       r.spendEstimate,
       r.orderedTakeout ? 'Yes' : 'No',
       r.paymentMethod || 'Unspecified',
-      r.awareOnlineSoloMeal || 'Unspecified',
     ]
       .map(escapeCsvCell)
       .join(',');

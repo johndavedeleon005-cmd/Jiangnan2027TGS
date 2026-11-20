@@ -19,7 +19,7 @@ import {
   ShieldOff,
   FileText,
   Globe,
-  HelpCircle,
+  ExternalLink,
   X,
 } from 'lucide-react';
 import {
@@ -29,7 +29,6 @@ import {
   GENDER_OPTIONS,
   LOCATION_OPTIONS,
   OCCUPATION_OPTIONS,
-  ONLINE_SOLO_AWARENESS_OPTIONS,
   PAYMENT_METHOD_OPTIONS,
   RELATIONSHIP_STATUS_OPTIONS,
   SPEND_BRACKETS,
@@ -37,7 +36,6 @@ import {
   VISIT_FREQUENCY_OPTIONS,
   getLocalDateString,
   type BranchOption,
-  type OnlineSoloAwarenessOption,
   type SurveyDraft,
   type SurveyResponse,
   type VisitFrequencyOption,
@@ -85,7 +83,6 @@ const INITIAL_DRAFT: SurveyDraft = {
   orderedTakeout: false,
   paymentMethod: '',
   paymentOther: '',
-  awareOnlineSoloMeal: '',
 };
 
 interface StepMeta {
@@ -203,15 +200,6 @@ const ALL_STEPS: StepMeta[] = [
     question: 'What is your preferred mode of payment?',
     subtitle: 'Select the payment option you prefer to use when dining.',
   },
-  {
-    id: 'onlineSoloAwareness',
-    number: '16',
-    title: 'Online Solo Meal',
-    question:
-      'Are you aware that you can order a Hot Pot Solo meal online thru our website?',
-    subtitle:
-      'Let us know if you already knew you can order a Hot Pot Solo meal directly on our website.',
-  },
 ];
 
 export function SurveyFlow({
@@ -229,6 +217,7 @@ export function SurveyFlow({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [completedResponse, setCompletedResponse] = useState<SurveyResponse | null>(null);
   const [showPrivacyModal, setShowPrivacyModal] = useState(true);
+  const [showSoloPromoModal, setShowSoloPromoModal] = useState(false);
 
   useEffect(() => {
     if (initialBranch) {
@@ -297,8 +286,6 @@ export function SurveyFlow({
         return draft.paymentMethod === 'Other'
           ? draft.paymentOther.trim().length > 0
           : Boolean(draft.paymentMethod);
-      case 'onlineSoloAwareness':
-        return Boolean(draft.awareOnlineSoloMeal);
       default:
         return false;
     }
@@ -355,8 +342,6 @@ export function SurveyFlow({
         return draft.paymentMethod === 'Other'
           ? draft.paymentOther.trim() || 'Other'
           : draft.paymentMethod;
-      case 'onlineSoloAwareness':
-        return draft.awareOnlineSoloMeal || null;
       default:
         return null;
     }
@@ -421,12 +406,11 @@ export function SurveyFlow({
         spendEstimate,
         orderedTakeout: draft.orderedTakeout,
         paymentMethod: paymentFinal,
-        awareOnlineSoloMeal:
-          draft.awareOnlineSoloMeal as OnlineSoloAwarenessOption,
         clientDate: getLocalDateString(new Date()),
       });
 
       setCompletedResponse(created);
+      setShowSoloPromoModal(true);
       onSubmitted(created);
     } catch (err) {
       setErrorMsg(
@@ -446,6 +430,7 @@ export function SurveyFlow({
     setStepIndex(0);
     setErrorMsg(null);
     setCompletedResponse(null);
+    setShowSoloPromoModal(false);
     setShowPrivacyModal(true);
   };
 
@@ -457,6 +442,101 @@ export function SurveyFlow({
 
     return (
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        {/* Online Hot Pot Solo Meal Promotional Pop-Up */}
+        {showSoloPromoModal && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="solo-meal-promo-title"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/65 backdrop-blur-xs"
+          >
+            <div className="relative w-full max-w-md bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xl">
+              <div className="relative bg-gradient-to-br from-red-600 via-red-600 to-red-700 px-6 pt-6 pb-7 text-white">
+                <button
+                  type="button"
+                  aria-label="Close promotion"
+                  onClick={() => setShowSoloPromoModal(false)}
+                  className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors"
+                >
+                  <X className="w-4 h-4" aria-hidden="true" />
+                </button>
+
+                <div className="flex items-center gap-3.5 pr-10">
+                  <div className="p-1.5 rounded-xl bg-white shadow-xs shrink-0">
+                    <BrandLogo sizeClass="w-11 h-11" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold tracking-wider uppercase text-red-100">
+                      Jiang Nan Online Ordering
+                    </p>
+                    <h2
+                      id="solo-meal-promo-title"
+                      className="text-xl sm:text-2xl font-bold leading-tight mt-0.5 text-balance"
+                    >
+                      Hot Pot Solo Meal, Delivered to You
+                    </h2>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-5">
+                <p className="text-sm sm:text-[15px] text-slate-700 leading-relaxed">
+                  Are you aware that you can order a{' '}
+                  <span className="font-semibold text-slate-900">
+                    Hot Pot Solo meal
+                  </span>{' '}
+                  online thru our website? Enjoy authentic Jiang Nan hotpot anytime,
+                  straight from your phone or desktop.
+                </p>
+
+                <a
+                  href="https://www.jiangnanhotpot.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between gap-3 p-3.5 rounded-xl border border-red-200 bg-red-50/70 hover:bg-red-50 transition-colors group"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-lg bg-red-600 text-white flex items-center justify-center shrink-0">
+                      <Globe className="w-4 h-4" aria-hidden="true" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-medium text-red-700">
+                        Official Website
+                      </div>
+                      <div className="text-sm font-bold text-slate-900 truncate group-hover:text-red-700 transition-colors">
+                        www.jiangnanhotpot.com
+                      </div>
+                    </div>
+                  </div>
+                  <ExternalLink
+                    className="w-4 h-4 text-red-600 shrink-0"
+                    aria-hidden="true"
+                  />
+                </a>
+
+                <div className="flex flex-col gap-2.5">
+                  <a
+                    href="https://www.jiangnanhotpot.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full min-h-[48px] px-5 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors"
+                  >
+                    <span>Order Online Now</span>
+                    <ExternalLink className="w-4 h-4" aria-hidden="true" />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setShowSoloPromoModal(false)}
+                    className="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium transition-colors"
+                  >
+                    View Survey Confirmation
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-10">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
@@ -534,16 +614,6 @@ export function SurveyFlow({
                 {completedResponse.paymentMethod}
               </span>
             </div>
-            {completedResponse.awareOnlineSoloMeal && (
-              <div className="flex items-center justify-between py-2 border-b border-slate-100 sm:border-b-0 sm:col-span-2">
-                <span className="text-slate-500">Online Hot Pot Solo Awareness</span>
-                <span className="font-medium text-slate-900">
-                  {completedResponse.awareOnlineSoloMeal === 'Yes'
-                    ? 'Yes, aware'
-                    : 'No, not yet aware'}
-                </span>
-              </div>
-            )}
             <div className="flex items-center justify-between py-2 sm:col-span-2">
               <span className="text-slate-500">Journey</span>
               <span className="font-medium text-slate-900 inline-flex items-center gap-1.5">
@@ -552,6 +622,42 @@ export function SurveyFlow({
                 <span>{completedResponse.destination}</span>
               </span>
             </div>
+          </div>
+
+          {/* Persistent Hot Pot Solo Meal Online Promo Banner */}
+          <div className="mt-6 p-4 sm:p-5 rounded-xl border border-red-200 bg-red-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 mt-0.5">
+                <Globe className="w-5 h-5" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-sm font-bold text-slate-900">
+                  Order a Hot Pot Solo Meal Online
+                </div>
+                <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
+                  Are you aware that you can order a Hot Pot Solo meal online thru our
+                  website? Visit{' '}
+                  <a
+                    href="https://www.jiangnanhotpot.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-red-600 hover:text-red-700 underline underline-offset-2"
+                  >
+                    www.jiangnanhotpot.com
+                  </a>
+                  .
+                </p>
+              </div>
+            </div>
+            <a
+              href="https://www.jiangnanhotpot.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 min-h-[42px] rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap shrink-0"
+            >
+              <span>Visit Website</span>
+              <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+            </a>
           </div>
 
           <div className="mt-8 flex flex-col sm:flex-row gap-3">
@@ -1835,61 +1941,6 @@ export function SurveyFlow({
                       />
                     </div>
                   )}
-                </div>
-              )}
-
-              {currentStep.id === 'onlineSoloAwareness' && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  {ONLINE_SOLO_AWARENESS_OPTIONS.map((option) => {
-                    const selected = draft.awareOnlineSoloMeal === option.value;
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() =>
-                          setDraft((prev) => ({
-                            ...prev,
-                            awareOnlineSoloMeal: option.value,
-                          }))
-                        }
-                        className={`min-h-[84px] p-4 sm:p-5 rounded-xl border text-left flex items-center justify-between gap-3 transition-all active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${
-                          selected
-                            ? 'border-red-500 bg-red-50/70 text-slate-900'
-                            : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-900'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3.5 min-w-0">
-                          <div
-                            className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
-                              selected
-                                ? 'bg-red-500 text-white'
-                                : 'bg-slate-100 text-slate-600'
-                            }`}
-                          >
-                            {option.value === 'Yes' ? (
-                              <Globe className="w-5 h-5" aria-hidden="true" />
-                            ) : (
-                              <HelpCircle className="w-5 h-5" aria-hidden="true" />
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-sm sm:text-base font-semibold leading-tight">
-                              {option.label}
-                            </div>
-                            <div className="text-xs text-slate-500 mt-1">
-                              {option.hint}
-                            </div>
-                          </div>
-                        </div>
-                        {selected && (
-                          <Check
-                            className="w-5 h-5 text-red-600 shrink-0"
-                            aria-hidden="true"
-                          />
-                        )}
-                      </button>
-                    );
-                  })}
                 </div>
               )}
             </div>
