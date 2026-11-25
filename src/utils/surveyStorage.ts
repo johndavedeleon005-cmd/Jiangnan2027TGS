@@ -418,11 +418,15 @@ export async function submitSurveyResponse(
 
       const surveyRef = doc(db, COLLECTION_PATH, entry.id);
       transaction.set(surveyRef, entry);
-      transaction.update(codeRef, {
+      const codeUpdate: Record<string, string> = {
         status: 'used',
         usedAt: entry.submittedAt,
         usedByResponseId: entry.id,
-      });
+      };
+      if (entry.branch) {
+        codeUpdate.usedAtBranch = entry.branch;
+      }
+      transaction.update(codeRef, codeUpdate);
     });
 
     return entry;

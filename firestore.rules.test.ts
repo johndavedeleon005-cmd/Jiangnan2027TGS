@@ -1,6 +1,6 @@
 /**
- * Security Rules Verification Suite for /surveys/{surveyId} & /surveyCodes/{codeId}
- * Verifies all Dirty Dozen payloads are rejected by the blueprint and single-use invariants.
+ * Security Rules Verification Suite for /surveys/{surveyId}, /surveyCodes/{codeId}, & /branchCodeLimits/{branchId}
+ * Verifies all Dirty Dozen payloads are rejected by the blueprint, single-use, and branch-quota invariants.
  */
 
 export interface DirtyDozenCase {
@@ -67,4 +67,30 @@ export const DIRTY_DOZEN_CASES: DirtyDozenCase[] = [
   { name: '14. Invalid visitFrequency enum', docId: 'SRV-TEST-0001', payload: { ...VALID_PAYLOAD, visitFrequency: '10th Time' }, expectAllowed: false },
   { name: '15. Missing surveyCode', docId: 'SRV-TEST-0001', payload: { ...VALID_PAYLOAD, surveyCode: '' }, expectAllowed: false },
   { name: '16. Invalid lowercase/symbols in surveyCode', docId: 'SRV-TEST-0001', payload: { ...VALID_PAYLOAD, surveyCode: 'bad code!' }, expectAllowed: false },
+  {
+    name: '17. Branch code limit negative maxCodes',
+    docId: 'BANAWE',
+    payload: {
+      id: 'BANAWE',
+      branch: 'BANAWE',
+      maxCodes: -5,
+      generatedCount: 0,
+      updatedAt: '2026-11-20T04:00:00.000Z',
+      updatedBy: 'Head Office',
+    },
+    expectAllowed: false,
+  },
+  {
+    name: '18. Branch code limit mismatched branchId and branch',
+    docId: 'BF_HOMES',
+    payload: {
+      id: 'BF_HOMES',
+      branch: 'BANAWE',
+      maxCodes: 20,
+      generatedCount: 0,
+      updatedAt: '2026-11-20T04:00:00.000Z',
+      updatedBy: 'Head Office',
+    },
+    expectAllowed: false,
+  },
 ];

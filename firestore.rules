@@ -14,6 +14,10 @@ service cloud.firestore {
       return code is string && code.size() >= 4 && code.size() <= 32 && code.matches('^[A-Z0-9_\\-]+$');
     }
 
+    function isValidBranchLimitId(id) {
+      return id is string && id.size() >= 4 && id.size() <= 40 && id.matches('^[A-Z0-9_]+$');
+    }
+
     function incoming() {
       return request.resource.data;
     }
@@ -48,6 +52,10 @@ service cloud.firestore {
       ];
     }
 
+    function isValidCodeCreator(creator) {
+      return creator is string && (creator == 'Head Office' || isValidBranch(creator));
+    }
+
     function isValidSurveyCodeDoc(data, codeId) {
       return data.keys().hasAll([
         'code',
@@ -65,17 +73,44 @@ service cloud.firestore {
         'branch',
         'note',
         'usedAt',
-        'usedByResponseId'
+        'usedByResponseId',
+        'usedAtBranch'
       ]) &&
       isValidSurveyCode(data.code) && data.code == codeId &&
       data.status is string && data.status.size() >= 4 && data.status.size() <= 8 && data.status in ['active', 'used', 'revoked'] &&
       data.createdAt is string && data.createdAt.size() >= 10 && data.createdAt.size() <= 40 &&
       data.createdDate is string && data.createdDate.size() == 10 && data.createdDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
-      data.createdBy is string && data.createdBy.size() == 11 && data.createdBy == 'Head Office' &&
+      isValidCodeCreator(data.createdBy) &&
       (!('branch' in data) || isValidBranch(data.branch)) &&
       (!('note' in data) || (data.note is string && data.note.size() <= 80)) &&
       (!('usedAt' in data) || (data.usedAt is string && data.usedAt.size() >= 10 && data.usedAt.size() <= 40)) &&
-      (!('usedByResponseId' in data) || isValidId(data.usedByResponseId));
+      (!('usedByResponseId' in data) || isValidId(data.usedByResponseId)) &&
+      (!('usedAtBranch' in data) || isValidBranch(data.usedAtBranch));
+    }
+
+    function isValidBranchCodeLimitDoc(data, branchId) {
+      return data.keys().hasAll([
+        'id',
+        'branch',
+        'maxCodes',
+        'generatedCount',
+        'updatedAt',
+        'updatedBy'
+      ]) &&
+      data.keys().hasOnly([
+        'id',
+        'branch',
+        'maxCodes',
+        'generatedCount',
+        'updatedAt',
+        'updatedBy'
+      ]) &&
+      isValidBranchLimitId(data.id) && data.id == branchId &&
+      isValidBranch(data.branch) && data.branch.replace(' ', '_') == branchId &&
+      data.maxCodes is number && data.maxCodes >= 0 && data.maxCodes <= 10000 &&
+      data.generatedCount is number && data.generatedCount >= 0 && data.generatedCount <= 10000 &&
+      data.updatedAt is string && data.updatedAt.size() >= 10 && data.updatedAt.size() <= 40 &&
+      data.updatedBy is string && data.updatedBy.size() == 11 && data.updatedBy == 'Head Office';
     }
 
     function isValidSurveyResponse(data, surveyId) {
@@ -174,15 +209,34 @@ service cloud.firestore {
       allow delete: if isValidId(surveyId) && existing().consent == 'Yes';
     }
 
+    function isWithinBranchQuota(branchName) {
+      let limitPath = /databases/$(database)/documents/branchCodeLimits/$(branchName.replace(' ', '_'));
+      let beforeLimit = get(limitPath).data;
+      let afterLimit = getAfter(limitPath).data;
+      return beforeLimit.maxCodes > 0 &&
+        beforeLimit.generatedCount < beforeLimit.maxCodes &&
+        afterLimit.generatedCount == beforeLimit.generatedCount + 1 &&
+        afterLimit.generatedCount <= beforeLimit.maxCodes;
+    }
+
     match /surveyCodes/{codeId} {
       allow get: if isValidSurveyCode(codeId) && (resource == null || existing().code == codeId);
-      allow list: if existing().createdBy == 'Head Office';
+      allow list: if existing().status in ['active', 'used', 'revoked'] || isValidBranch(existing().branch);
       allow create: if isValidSurveyCode(codeId) &&
         isValidSurveyCodeDoc(incoming(), codeId) &&
         incoming().status == 'active' &&
-        incoming().createdBy == 'Head Office' &&
         !('usedAt' in incoming()) &&
-        !('usedByResponseId' in incoming());
+        !('usedByResponseId' in incoming()) &&
+        !('usedAtBranch' in incoming()) &&
+        (
+          incoming().createdBy == 'Head Office' ||
+          (
+            isValidBranch(incoming().createdBy) &&
+            'branch' in incoming() &&
+            incoming().branch == incoming().createdBy &&
+            isWithinBranchQuota(incoming().branch)
+          )
+        );
       allow update: if isValidSurveyCode(codeId) &&
         isValidSurveyCodeDoc(incoming(), codeId) &&
         existing().status == 'active' &&
@@ -193,16 +247,37 @@ service cloud.firestore {
         (
           (
             incoming().status == 'used' &&
-            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'usedAt', 'usedByResponseId']) &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'usedAt', 'usedByResponseId', 'usedAtBranch']) &&
             'usedAt' in incoming() &&
             'usedByResponseId' in incoming() &&
-            existsAfter(/databases/$(database)/documents/surveys/$(incoming().usedByResponseId))
+            existsAfter(/databases/$(database)/documents/surveys/$(incoming().usedByResponseId)) &&
+            (
+              !('usedAtBranch' in incoming()) ||
+              getAfter(/databases/$(database)/documents/surveys/$(incoming().usedByResponseId)).data.branch == incoming().usedAtBranch
+            )
           ) || (
             incoming().status == 'revoked' &&
             incoming().diff(existing()).affectedKeys().hasOnly(['status'])
           )
         );
       allow delete: if isValidSurveyCode(codeId) && existing().status == 'revoked';
+    }
+
+    match /branchCodeLimits/{branchId} {
+      allow get: if isValidBranchLimitId(branchId) && (resource == null || existing().id == branchId);
+      allow list: if existing().updatedBy == 'Head Office';
+      allow create: if isValidBranchLimitId(branchId) &&
+        isValidBranchCodeLimitDoc(incoming(), branchId);
+      allow update: if isValidBranchLimitId(branchId) &&
+        isValidBranchCodeLimitDoc(incoming(), branchId) &&
+        incoming().id == existing().id &&
+        incoming().branch == existing().branch &&
+        incoming().updatedBy == existing().updatedBy &&
+        (
+          incoming().diff(existing()).affectedKeys().hasOnly(['maxCodes', 'generatedCount', 'updatedAt']) ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['generatedCount', 'updatedAt'])
+        );
+      allow delete: if false;
     }
   }
 }

@@ -555,7 +555,7 @@ export function SurveyFlow({
                       id="solo-meal-promo-title"
                       className="text-xl sm:text-2xl font-bold leading-tight mt-0.5 text-balance"
                     >
-                      Hot Pot Solo Meal, Delivered to You
+                      Enjoy Authentic Hotpot anywhere, anytime!
                     </h2>
                   </div>
                 </div>
@@ -563,12 +563,12 @@ export function SurveyFlow({
 
               <div className="p-6 space-y-5">
                 <p className="text-sm sm:text-[15px] text-slate-700 leading-relaxed">
-                  Are you aware that you can order a{' '}
+                  Craving Jiang Nan at home or at the office? Order your favorite{' '}
                   <span className="font-semibold text-slate-900">
                     Hot Pot Solo meal
                   </span>{' '}
-                  online thru our website? Enjoy authentic Jiang Nan hotpot anytime,
-                  straight from your phone or desktop.
+                  online through our official website and savor rich, authentic hotpot
+                  whenever the craving hits.
                 </p>
 
                 <a
@@ -722,11 +722,11 @@ export function SurveyFlow({
               </div>
               <div className="min-w-0">
                 <div className="text-sm font-bold text-slate-900">
-                  Order a Hot Pot Solo Meal Online
+                  Enjoy Authentic Hotpot anywhere, anytime!
                 </div>
                 <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
-                  Are you aware that you can order a Hot Pot Solo meal online thru our
-                  website? Visit{' '}
+                  Craving Jiang Nan? Order your favorite Hot Pot Solo meal online through our
+                  official website at{' '}
                   <a
                     href="https://www.jiangnanhotpot.com"
                     target="_blank"
@@ -1141,8 +1141,8 @@ export function SurveyFlow({
                             Survey Code <span className="text-red-600">*</span>
                           </label>
                           <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
-                            Enter an active single-use survey code issued from the Head Office
-                            dashboard. Each code can only be used once.
+                            Enter an active single-use survey code issued by Jiang Nan
+                            staff. Each code can only be used once.
                           </p>
                         </div>
                       </div>

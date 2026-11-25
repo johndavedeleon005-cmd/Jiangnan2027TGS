@@ -742,7 +742,7 @@ export function DashboardView({
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          {isHeadOffice && onOpenSurveyCodes && (
+          {onOpenSurveyCodes && (
             <button
               type="button"
               onClick={onOpenSurveyCodes}

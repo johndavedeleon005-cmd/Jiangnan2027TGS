@@ -14,6 +14,7 @@ import {
   getLocalDateString,
   normalizeBranchName,
   normalizeSurveyCode,
+  type BranchCodeLimitRecord,
   type BranchOption,
   type SurveyCodeRecord,
   type SurveyResponse,
@@ -32,7 +33,10 @@ import {
   loadSurveyResponses,
   subscribeToSurveyResponses,
 } from './utils/surveyStorage';
-import { subscribeToSurveyCodes } from './utils/surveyCodeStorage';
+import {
+  subscribeToBranchCodeLimits,
+  subscribeToSurveyCodes,
+} from './utils/surveyCodeStorage';
 
 function parseHashLocation(): { path: string; params: URLSearchParams } {
   if (typeof window === 'undefined') {
@@ -108,6 +112,9 @@ export default function App() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [surveyCodes, setSurveyCodes] = useState<SurveyCodeRecord[]>([]);
+  const [branchLimits, setBranchLimits] = useState<
+    Record<string, BranchCodeLimitRecord>
+  >({});
   const [isLoadingCodes, setIsLoadingCodes] = useState<boolean>(false);
   const [codesError, setCodesError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
@@ -177,6 +184,7 @@ export default function App() {
     setAuthenticatedAccount(null);
     setResponses([]);
     setSurveyCodes([]);
+    setBranchLimits({});
     setCodesError(null);
     saveStoredDashboardAccount(null);
   }, []);
@@ -205,19 +213,17 @@ export default function App() {
   }, [isDashboardUnlocked]);
 
   useEffect(() => {
-    if (!isHeadOffice) {
+    if (!isDashboardUnlocked) {
       setSurveyCodes([]);
+      setBranchLimits({});
       setIsLoadingCodes(false);
       setCodesError(null);
-      if (isDashboardUnlocked && activeView === 'codes') {
-        navigateTo('dashboard', lockedBranch);
-      }
       return;
     }
 
     setIsLoadingCodes(true);
     setCodesError(null);
-    const unsubscribe = subscribeToSurveyCodes(
+    const unsubCodes = subscribeToSurveyCodes(
       (items) => {
         setSurveyCodes(items);
         setIsLoadingCodes(false);
@@ -226,12 +232,25 @@ export default function App() {
       (err) => {
         setCodesError(err.message || 'Unable to load survey codes.');
         setIsLoadingCodes(false);
-      }
+      },
+      lockedBranch
     );
+
+    const unsubLimits = subscribeToBranchCodeLimits(
+      (limits) => {
+        setBranchLimits(limits);
+      },
+      (err) => {
+        setCodesError(err.message || 'Unable to load branch code limits.');
+      },
+      lockedBranch
+    );
+
     return () => {
-      unsubscribe();
+      unsubCodes();
+      unsubLimits();
     };
-  }, [isHeadOffice, isDashboardUnlocked, activeView, lockedBranch, navigateTo]);
+  }, [isDashboardUnlocked, lockedBranch]);
 
   const activeCodeCount = useMemo(
     () => surveyCodes.filter((c) => c.status === 'active').length,
@@ -331,10 +350,8 @@ export default function App() {
       <Header
         activeView={activeView}
         isLocked={isLocked}
-        isHeadOffice={isHeadOffice}
         activeCodeCount={activeCodeCount}
         onSelectView={(view) => {
-          if (view === 'codes' && !isHeadOffice) return;
           navigateTo(view, view === 'codes' ? null : lockedBranch);
         }}
         onDownloadCsv={() => void handleDownloadLatestCsv()}
@@ -358,11 +375,14 @@ export default function App() {
             onUnlock={handleUnlockDashboard}
             onOpenSurvey={(branch) => navigateTo('survey', branch)}
           />
-        ) : activeView === 'codes' && isHeadOffice ? (
+        ) : activeView === 'codes' ? (
           <SurveyCodesView
             codes={surveyCodes}
+            responses={visibleResponses}
             isLoading={isLoadingCodes}
             error={codesError}
+            lockedBranch={lockedBranch}
+            branchLimits={branchLimits}
           />
         ) : (
           <DashboardView
@@ -387,9 +407,7 @@ export default function App() {
               void handleDownloadLatestCsv(filtered, label)
             }
             isDownloading={isDownloading}
-            onOpenSurveyCodes={
-              isHeadOffice ? () => navigateTo('codes') : undefined
-            }
+            onOpenSurveyCodes={() => navigateTo('codes', lockedBranch)}
             activeCodeCount={activeCodeCount}
           />
         )}

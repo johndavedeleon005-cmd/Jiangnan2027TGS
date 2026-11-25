@@ -105,6 +105,20 @@ export interface SurveyCodeRecord {
   note?: string;
   usedAt?: string;
   usedByResponseId?: string;
+  usedAtBranch?: BranchOption;
+}
+
+export interface BranchCodeLimitRecord {
+  id: string;
+  branch: BranchOption;
+  maxCodes: number;
+  generatedCount: number;
+  updatedAt: string;
+  updatedBy: 'Head Office';
+}
+
+export function getBranchLimitDocId(branch: BranchOption): string {
+  return branch.replace(/\s+/g, '_');
 }
 
 export function normalizeSurveyCode(raw?: string | null): string {
